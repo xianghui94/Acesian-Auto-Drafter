@@ -1,0 +1,5 @@
+{
+  "name": "Acesian Auto-Drafter",
+  "description": "A web-based HVAC ductwork drafting automation tool powered by Gemini. Generates technical SVG drawings based on specific shop floor dimensions and rules.",
+  "requestFramePermissions": []
+}
