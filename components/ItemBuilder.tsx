@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ComponentType, DuctParams } from '../types';
 import { generateDuctDrawing } from '../services/geminiService';
+import * as Inputs from './DuctInputs';
 
 interface ItemBuilderProps {
   onAddItem: (item: any) => void;
@@ -37,11 +38,28 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
             d1: 500, 
             length: 1200, 
             tapQty: 1,
+            nptQty: 0,
             seamAngle: 0,
-            taps: [{ dist: 600, diameter: 150, angle: 0 }] 
+            taps: [{ dist: 600, diameter: 150, angle: 0, remark: "" }],
+            nptPorts: []
         }); 
         break;
+      case ComponentType.BLIND_PLATE: setParams({ d1: 200 }); break;
+      case ComponentType.BLAST_GATE_DAMPER: setParams({ d1: 200, length: 200 }); break;
+      case ComponentType.ANGLE_FLANGE: setParams({ d1: 800 }); break;
     }
+
+    // Default Meta handling for specific types
+    if (componentType === ComponentType.BLIND_PLATE) {
+        setMeta(prev => ({ ...prev, thickness: "3.0" }));
+    } else if (componentType === ComponentType.ANGLE_FLANGE) {
+        // Default is bare (Coating: No)
+        setMeta(prev => ({ ...prev, coating: "No" }));
+    } else {
+        // Reset to standard duct thickness if it was the blind plate default
+        setMeta(prev => (prev.thickness === "3.0" ? { ...prev, thickness: "0.8" } : prev));
+    }
+
   }, [componentType]);
 
   const handleParamChange = (key: string, val: any) => {
@@ -63,6 +81,9 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
     if (componentType === ComponentType.MULTIBLADE_DAMPER && key === 'd1') {
         newParams.length = 400;
     }
+    
+    // Blast Gate Damper - Default Length 200 handled in useEffect, user can override if needed.
+    // Removed logic forcing length change on diameter change for Blast Gate.
 
     setParams(newParams);
   };
@@ -75,7 +96,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
       if (newQty > newTaps.length) {
           // Add new taps with defaults
           for (let i = newTaps.length; i < newQty; i++) {
-              newTaps.push({ dist: 100, diameter: 100, angle: 0 });
+              newTaps.push({ dist: 100, diameter: 100, angle: 0, remark: "" });
           }
       } else if (newQty < newTaps.length) {
           // Remove from end
@@ -85,11 +106,37 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
       setParams({ ...params, tapQty: newQty, taps: newTaps });
   };
 
-  const handleTapUpdate = (index: number, field: string, value: number) => {
+  const handleNptQtyChange = (newQty: number) => {
+      if (newQty < 0) return;
+      const currentPorts = params.nptPorts || [];
+      let newPorts = [...currentPorts];
+      
+      if (newQty > newPorts.length) {
+          // Add new ports with defaults
+          for (let i = newPorts.length; i < newQty; i++) {
+              newPorts.push({ dist: 100, size: '1"', angle: 0, remark: "" });
+          }
+      } else if (newQty < newPorts.length) {
+          // Remove from end
+          newPorts = newPorts.slice(0, newQty);
+      }
+      
+      setParams({ ...params, nptQty: newQty, nptPorts: newPorts });
+  };
+
+  const handleTapUpdate = (index: number, field: string, value: any) => {
       const newTaps = [...(params.taps || [])];
       if (newTaps[index]) {
           newTaps[index] = { ...newTaps[index], [field]: value };
           setParams({ ...params, taps: newTaps });
+      }
+  };
+
+  const handleNptUpdate = (index: number, field: string, value: any) => {
+      const newPorts = [...(params.nptPorts || [])];
+      if (newPorts[index]) {
+          newPorts[index] = { ...newPorts[index], [field]: value };
+          setParams({ ...params, nptPorts: newPorts });
       }
   };
 
@@ -109,7 +156,16 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
     } else if (componentType === ComponentType.MULTIBLADE_DAMPER) {
         description = `${params.bladeType} Multiblade Damper`;
     } else if (componentType === ComponentType.STRAIGHT_WITH_TAPS) {
-        description = `Straight w/ ${params.tapQty} Taps`;
+        let desc = "Straight";
+        if (params.tapQty > 0) desc += ` w/ ${params.tapQty} Taps`;
+        if (params.nptQty > 0) desc += ` & ${params.nptQty} NPT`;
+        description = desc;
+    } else if (componentType === ComponentType.BLIND_PLATE) {
+        description = `Blind Plate Ø${params.d1}`;
+    } else if (componentType === ComponentType.BLAST_GATE_DAMPER) {
+        description = `Blast Gate Damper Ø${params.d1}`;
+    } else if (componentType === ComponentType.ANGLE_FLANGE) {
+        description = `Angle Flange Ø${params.d1}`;
     }
     
     onAddItem({
@@ -127,164 +183,36 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
   const renderParamsInputs = () => {
     switch (componentType) {
       case ComponentType.ELBOW:
-        return (
-          <>
-            <NumInput label="D1 (mm)" value={params.d1} onChange={v => handleParamChange('d1', v)} />
-            <div>
-                <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Angle (°)</label>
-                <select 
-                    value={params.angle}
-                    onChange={(e) => handleParamChange('angle', Number(e.target.value))}
-                    className="w-full p-1.5 border border-cad-300 rounded text-sm bg-white font-mono"
-                >
-                    {[30, 45, 60, 90].map(deg => <option key={deg} value={deg}>{deg}</option>)}
-                </select>
-            </div>
-          </>
-        );
+        return <Inputs.ElbowInputs params={params} onChange={handleParamChange} />;
       case ComponentType.REDUCER:
-        return (
-          <>
-            <NumInput label="D1 (mm)" value={params.d1} onChange={v => handleParamChange('d1', v)} />
-            <NumInput label="D2 (mm)" value={params.d2} onChange={v => handleParamChange('d2', v)} />
-            <NumInput label="Total L (mm)" value={params.length} onChange={v => handleParamChange('length', v)} />
-          </>
-        );
+        return <Inputs.ReducerInputs params={params} onChange={handleParamChange} />;
       case ComponentType.STRAIGHT:
-        return (
-            <>
-              <NumInput label="D1 (mm)" value={params.d1} onChange={v => handleParamChange('d1', v)} />
-              <NumInput label="Len (mm)" value={params.length} onChange={v => handleParamChange('length', v)} />
-            </>
-        );
+        return <Inputs.StraightInputs params={params} onChange={handleParamChange} />;
       case ComponentType.TEE:
-        return (
-            <>
-              <NumInput label="Main D (mm)" value={params.main_d} onChange={v => handleParamChange('main_d', v)} />
-              <NumInput label="Tap D (mm)" value={params.tap_d} onChange={v => handleParamChange('tap_d', v)} />
-            </>
-        );
+        return <Inputs.TeeInputs params={params} onChange={handleParamChange} />;
       case ComponentType.TRANSFORMATION:
-        return (
-            <>
-              <NumInput label="Diameter Ø (mm)" value={params.d1} onChange={v => handleParamChange('d1', v)} />
-              <NumInput label="Rect L (mm)" value={params.width} onChange={v => handleParamChange('width', v)} />
-              <NumInput label="Rect W (mm)" value={params.height} onChange={v => handleParamChange('height', v)} />
-              <NumInput label="Length L (mm)" value={params.length} onChange={v => handleParamChange('length', v)} />
-            </>
-        );
+        return <Inputs.TransformationInputs params={params} onChange={handleParamChange} />;
       case ComponentType.VOLUME_DAMPER:
-        return (
-            <>
-              <NumInput label="Diameter Ø (mm)" value={params.d1} onChange={v => handleParamChange('d1', v)} />
-              <div>
-                  <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Length L (Fixed)</label>
-                  <input 
-                      type="number" 
-                      value={params.length} 
-                      disabled
-                      className="w-full p-1.5 border border-cad-200 bg-cad-50 rounded text-sm font-mono text-cad-500 cursor-not-allowed"
-                  />
-              </div>
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Actuation</label>
-                <select 
-                    value={params.actuation}
-                    onChange={(e) => handleParamChange('actuation', e.target.value)}
-                    className="w-full p-1.5 border border-cad-300 rounded text-sm bg-white"
-                >
-                    <option value="Handle">Handle</option>
-                    <option value="Worm Gear">Worm Gear</option>
-                </select>
-            </div>
-            </>
-        );
+        return <Inputs.VolumeDamperInputs params={params} onChange={handleParamChange} />;
       case ComponentType.MULTIBLADE_DAMPER:
-        return (
-            <>
-              <NumInput label="Diameter Ø (mm)" value={params.d1} onChange={v => handleParamChange('d1', v)} />
-              <div>
-                  <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Length L (Fixed)</label>
-                  <input 
-                      type="number" 
-                      value={params.length} 
-                      disabled
-                      className="w-full p-1.5 border border-cad-200 bg-cad-50 rounded text-sm font-mono text-cad-500 cursor-not-allowed"
-                  />
-              </div>
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Blade Type</label>
-                <select 
-                    value={params.bladeType}
-                    onChange={(e) => handleParamChange('bladeType', e.target.value)}
-                    className="w-full p-1.5 border border-cad-300 rounded text-sm bg-white"
-                >
-                    <option value="Parallel">Parallel</option>
-                    <option value="Opposed">Opposed</option>
-                </select>
-            </div>
-            </>
-        );
+        return <Inputs.MultibladeDamperInputs params={params} onChange={handleParamChange} />;
       case ComponentType.STRAIGHT_WITH_TAPS:
         return (
-            <>
-              <NumInput label="Main D (mm)" value={params.d1} onChange={v => handleParamChange('d1', v)} />
-              <NumInput label="Total L (mm)" value={params.length} onChange={v => handleParamChange('length', v)} />
-              <NumInput label="Qty of Taps" value={params.tapQty || 0} onChange={handleTapQtyChange} />
-              
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Seam Pos (°)</label>
-                <select 
-                    value={params.seamAngle !== undefined ? params.seamAngle : 0}
-                    onChange={(e) => handleParamChange('seamAngle', Number(e.target.value))}
-                    className="w-full p-1.5 border border-cad-300 rounded text-sm bg-white font-mono"
-                >
-                    {[0, 45, 90, 135, 180, 225, 270, 315].map(deg => <option key={deg} value={deg}>{deg}</option>)}
-                </select>
-              </div>
-
-              <div className="col-span-2 md:col-span-4 lg:col-span-6 mt-2">
-                 <div className="bg-cad-50 border border-cad-200 rounded p-2">
-                    <label className="block text-xs font-bold text-cad-500 mb-2 uppercase tracking-wide">Tap Configuration</label>
-                    <div className="grid grid-cols-4 gap-2 mb-1 text-[10px] font-bold text-cad-400 px-1">
-                        <div>#</div>
-                        <div>Dist from End (mm)</div>
-                        <div>Diameter (mm)</div>
-                        <div>Angle (deg)</div>
-                    </div>
-                    {params.taps && params.taps.map((tap: any, idx: number) => (
-                        <div key={idx} className="grid grid-cols-4 gap-2 mb-2 items-center">
-                            <div className="text-xs font-mono font-bold text-center bg-cad-200 rounded py-1">{idx + 1}</div>
-                            <input 
-                                type="number" 
-                                value={tap.dist} 
-                                onChange={(e) => handleTapUpdate(idx, 'dist', Number(e.target.value))}
-                                className="w-full p-1 border border-cad-300 rounded text-xs font-mono"
-                                placeholder="Distance"
-                            />
-                            <input 
-                                type="number" 
-                                value={tap.diameter} 
-                                onChange={(e) => handleTapUpdate(idx, 'diameter', Number(e.target.value))}
-                                className="w-full p-1 border border-cad-300 rounded text-xs font-mono"
-                                placeholder="Diameter"
-                            />
-                             <input 
-                                type="number" 
-                                value={tap.angle} 
-                                onChange={(e) => handleTapUpdate(idx, 'angle', Number(e.target.value))}
-                                className="w-full p-1 border border-cad-300 rounded text-xs font-mono"
-                                placeholder="0 = Top"
-                            />
-                        </div>
-                    ))}
-                    {(!params.taps || params.taps.length === 0) && (
-                        <div className="text-xs text-cad-400 italic p-2 text-center">No taps configured. Increase qty above.</div>
-                    )}
-                 </div>
-              </div>
-            </>
+            <Inputs.StraightWithTapsInputs 
+                params={params} 
+                onChange={handleParamChange} 
+                onTapQtyChange={handleTapQtyChange}
+                onNptQtyChange={handleNptQtyChange}
+                onTapUpdate={handleTapUpdate}
+                onNptUpdate={handleNptUpdate}
+            />
         );
+      case ComponentType.BLIND_PLATE:
+        return <Inputs.BlindPlateInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.BLAST_GATE_DAMPER:
+        return <Inputs.BlastGateDamperInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.ANGLE_FLANGE:
+        return <Inputs.AngleFlangeInputs params={params} onChange={handleParamChange} />;
     }
   };
 
