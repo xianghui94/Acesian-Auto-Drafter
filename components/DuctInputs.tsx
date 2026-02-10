@@ -37,6 +37,7 @@ export const ElbowInputs: React.FC<InputProps> = ({ params, onChange }) => (
                 {[30, 45, 60, 90].map(deg => <option key={deg} value={deg}>{deg}</option>)}
             </select>
         </div>
+        <NumInput label="Radius R (mm)" value={params.radius} onChange={v => onChange('radius', v)} />
     </>
 );
 
@@ -280,5 +281,13 @@ export const BlastGateDamperInputs: React.FC<InputProps> = ({ params, onChange }
 export const AngleFlangeInputs: React.FC<InputProps> = ({ params, onChange }) => (
     <>
         <NumInput label="Diameter Ø (mm)" value={params.d1} onChange={v => onChange('d1', v)} />
+    </>
+);
+
+export const OffsetInputs: React.FC<InputProps> = ({ params, onChange }) => (
+    <>
+        <NumInput label="Diameter Ø (mm)" value={params.d1} onChange={v => onChange('d1', v)} />
+        <NumInput label="Length L (mm)" value={params.length} onChange={v => onChange('length', v)} />
+        <NumInput label="Offset H (mm)" value={params.offset} onChange={v => onChange('offset', v)} />
     </>
 );

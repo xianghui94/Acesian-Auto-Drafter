@@ -26,7 +26,11 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
   // Update defaults based on component type
   useEffect(() => {
     switch (componentType) {
-      case ComponentType.ELBOW: setParams({ d1: 500, angle: 90 }); break;
+      case ComponentType.ELBOW: 
+        // Initial defaults for Elbow
+        // Default D=500. For D>=200, we use Throat R = 0.5D -> 250
+        setParams({ d1: 500, angle: 90, radius: 250 }); 
+        break;
       case ComponentType.REDUCER: setParams({ d1: 500, d2: 300, length: 500 }); break;
       case ComponentType.STRAIGHT: setParams({ d1: 300, length: 1000 }); break;
       case ComponentType.TEE: setParams({ main_d: 500, tap_d: 300, length: 500, branch_l: 100 }); break;
@@ -47,6 +51,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
       case ComponentType.BLIND_PLATE: setParams({ d1: 200 }); break;
       case ComponentType.BLAST_GATE_DAMPER: setParams({ d1: 200, length: 200 }); break;
       case ComponentType.ANGLE_FLANGE: setParams({ d1: 800 }); break;
+      case ComponentType.OFFSET: setParams({ d1: 500, length: 800, offset: 200 }); break;
     }
 
     // Default Meta handling for specific types
@@ -55,6 +60,9 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
     } else if (componentType === ComponentType.ANGLE_FLANGE) {
         // Default is bare (Coating: No)
         setMeta(prev => ({ ...prev, coating: "No" }));
+    } else if (componentType === ComponentType.OFFSET) {
+        // Initial check for Offset thickness default
+        setMeta(prev => ({ ...prev, thickness: "0.9" }));
     } else {
         // Reset to standard duct thickness if it was the blind plate default
         setMeta(prev => (prev.thickness === "3.0" ? { ...prev, thickness: "0.8" } : prev));
@@ -65,12 +73,19 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
   const handleParamChange = (key: string, val: any) => {
     let newParams = { ...params, [key]: val };
     
+    // Elbow Radius Auto-calc logic: 
+    // If Diameter changes, update Radius.
+    // "R" refers to Inner/Throat Radius.
+    // D < 200: Centerline ~ 1.5D => Inner ~ 1.0D
+    // D >= 200: Centerline ~ 1.0D => Inner ~ 0.5D
+    if (componentType === ComponentType.ELBOW && key === 'd1') {
+        const d = Number(val);
+        newParams.radius = (d < 200) ? d * 1.0 : d * 0.5;
+    }
+
     // Special logic for Volume Damper Length
     if (componentType === ComponentType.VOLUME_DAMPER && key === 'd1') {
         const d = Number(val);
-        // "relationship between diameter and length is fixed as shown in the table"
-        // D <= 200 -> L = 150
-        // D > 200  -> L = 224
         if (d <= 200) {
             newParams.length = 150;
         } else {
@@ -85,6 +100,17 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
     // Tee Length Auto-calc (L = Bd + 200)
     if (componentType === ComponentType.TEE && key === 'tap_d') {
         newParams.length = Number(val) + 200;
+    }
+
+    // Offset Thickness Logic (Based on Table)
+    if (componentType === ComponentType.OFFSET && key === 'd1') {
+        const d = Number(val);
+        let thk = "0.9";
+        if (d <= 500) thk = "0.9";
+        else if (d <= 650) thk = "1.2";
+        else if (d <= 1100) thk = "1.5";
+        else thk = "2.0";
+        setMeta(prev => ({...prev, thickness: thk}));
     }
     
     setParams(newParams);
@@ -170,6 +196,10 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
         description = `Angle Flange Ø${params.d1}`;
     } else if (componentType === ComponentType.TEE) {
         description = `Tee Ø${params.main_d} / Ø${params.tap_d}`;
+    } else if (componentType === ComponentType.OFFSET) {
+        description = `Offset Ø${params.d1} / L=${params.length} / H=${params.offset}`;
+    } else if (componentType === ComponentType.ELBOW) {
+        description = `Elbow Ø${params.d1} / ${params.angle}° / R${params.radius}`;
     }
     
     onAddItem({
@@ -217,6 +247,8 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
         return <Inputs.BlastGateDamperInputs params={params} onChange={handleParamChange} />;
       case ComponentType.ANGLE_FLANGE:
         return <Inputs.AngleFlangeInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.OFFSET:
+        return <Inputs.OffsetInputs params={params} onChange={handleParamChange} />;
     }
   };
 

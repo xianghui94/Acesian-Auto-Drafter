@@ -61,80 +61,127 @@ export const generateElbow = (params: DuctParams) => {
   const angle = params.angle || 90;
   const D_real = params.d1 || 500;
   
-  let numSegments = 3;
-  let rMult = 1.0; 
-  if (D_real < 200) { rMult = 1.5; } else { rMult = 1.0; }
-  if (angle === 90) { numSegments = (D_real < 450) ? 4 : 5; } 
-  else if (angle === 60) { numSegments = (D_real < 250) ? 2 : 4; } 
-  else if (angle === 45) { numSegments = (D_real < 250) ? 2 : 3; } 
-  else if (angle === 30) { numSegments = (D_real < 600) ? 2 : 3; } 
-  else { if (angle > 60) numSegments = 4; else numSegments = 2; }
+  // R Calculation (Inner Radius)
+  // Default logic: If D < 200, R_inner ~ 1.0D (Center ~1.5D)
+  //                If D >= 200, R_inner ~ 0.5D (Center ~1.0D)
+  const valInnerR = params.radius !== undefined ? params.radius : ((D_real < 200) ? D_real * 1.0 : D_real * 0.5);
+  
+  // Visual Scaling based on shape ratio (R_inner / D)
+  const rRatio = valInnerR / D_real;
 
   const V_D = V_CONSTANTS.DIAM;
-  const V_R_visual = V_D * rMult;
-  const T = 0; 
+  const V_R_Inner = V_D * rRatio;
+  const V_R_Outer = V_R_Inner + V_D;
+  const V_R_Center = V_R_Inner + V_D/2;
+
+  // Layout Constants
+  const T = 0; // Tangent length
   const x0 = 60; 
   const y0 = 120;
-  const rCenter = V_R_visual;
-  const rOuter = rCenter + V_D/2;
-  const rInner = rCenter - V_D/2;
+  
+  // Pivot Point
   const cx = x0 + T;
-  const cy = y0 + rOuter;
+  const cy = y0 + V_R_Outer;
+  
+  // Angles (in radians)
   const startRad = -Math.PI / 2;
   const sweepRad = (angle * Math.PI) / 180;
   const endRad = startRad + sweepRad;
 
-  const verticesOuter = [];
-  const verticesInner = [];
+  // Segment Calculation based on specific rules
+  let numSegments = 2; // safety fallback
+  if (angle === 90) {
+      numSegments = (D_real <= 150) ? 4 : 5;
+  } else if (angle === 60) {
+      numSegments = (D_real <= 150) ? 2 : 4;
+  } else if (angle === 45) {
+      numSegments = (D_real <= 150) ? 2 : 3;
+  } else if (angle === 30) {
+      numSegments = (D_real <= 950) ? 2 : 3;
+  } else {
+      // General scaling for other angles
+      if (angle > 60) numSegments = 4;
+      else if (angle > 30) numSegments = 3;
+      else numSegments = 2;
+  }
+
+  // Generate Points
+  const ptsOuter = [];
+  const ptsInner = [];
+  const ptsCenter = [];
 
   for (let i = 0; i <= numSegments; i++) {
     const frac = i / numSegments;
     const theta = startRad + (sweepRad * frac);
-    verticesOuter.push({ x: cx + rOuter * Math.cos(theta), y: cy + rOuter * Math.sin(theta) });
-    verticesInner.push({ x: cx + rInner * Math.cos(theta), y: cy + rInner * Math.sin(theta) });
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    
+    ptsOuter.push({ x: cx + V_R_Outer * cos, y: cy + V_R_Outer * sin });
+    ptsInner.push({ x: cx + V_R_Inner * cos, y: cy + V_R_Inner * sin });
+    ptsCenter.push({ x: cx + V_R_Center * cos, y: cy + V_R_Center * sin });
   }
 
-  const lastOut = verticesOuter[numSegments];
-  const lastIn = verticesInner[numSegments];
+  // End Extensions
   const tanAngle = endRad + Math.PI / 2;
   const tx = Math.cos(tanAngle);
   const ty = Math.sin(tanAngle);
+  
+  const lastOut = ptsOuter[numSegments];
+  const lastIn = ptsInner[numSegments];
+  const lastC = ptsCenter[numSegments];
+  
   const endOut = { x: lastOut.x + T * tx, y: lastOut.y + T * ty };
   const endIn = { x: lastIn.x + T * tx, y: lastIn.y + T * ty };
+  const endC = { x: lastC.x + T * tx, y: lastC.y + T * ty };
 
-  let dOuter = `M${x0},${y0} L${verticesOuter[0].x},${verticesOuter[0].y}`;
-  for (let i = 1; i <= numSegments; i++) { dOuter += ` L${verticesOuter[i].x},${verticesOuter[i].y}`; }
+  // Build Paths
+  let dOuter = `M${x0},${y0} L${ptsOuter[0].x},${ptsOuter[0].y}`;
+  for (let i = 1; i <= numSegments; i++) dOuter += ` L${ptsOuter[i].x},${ptsOuter[i].y}`;
   dOuter += ` L${endOut.x},${endOut.y}`;
 
-  let dInner = `M${x0},${y0 + V_D} L${verticesInner[0].x},${verticesInner[0].y}`;
-  for (let i = 1; i <= numSegments; i++) { dInner += ` L${verticesInner[i].x},${verticesInner[i].y}`; }
+  let dInner = `M${x0},${y0 + V_D} L${ptsInner[0].x},${ptsInner[0].y}`;
+  for (let i = 1; i <= numSegments; i++) dInner += ` L${ptsInner[i].x},${ptsInner[i].y}`;
   dInner += ` L${endIn.x},${endIn.y}`;
 
+  // Visual Centerline
+  let dCenter = `M${x0 + V_D/2},${y0}`; 
+  for (let i = 0; i <= numSegments; i++) dCenter += ` L${ptsCenter[i].x},${ptsCenter[i].y}`;
+  dCenter += ` L${endC.x},${endC.y}`;
+  const centerLinePath = `<path d="${dCenter}" class="phantom-line" />`;
+
+  // Seams
   let seams = "";
   for (let i = 0; i <= numSegments; i++) {
-    seams += `<line x1="${verticesInner[i].x}" y1="${verticesInner[i].y}" x2="${verticesOuter[i].x}" y2="${verticesOuter[i].y}" class="line" stroke-width="0.5" />`;
+    seams += `<line x1="${ptsInner[i].x}" y1="${ptsInner[i].y}" x2="${ptsOuter[i].x}" y2="${ptsOuter[i].y}" class="line" stroke-width="0.5" />`;
   }
 
+  // Flanges
   const f1 = drawFlange(x0, y0 + V_D/2, V_D, true);
-  const endCx = (endOut.x + endIn.x) / 2;
-  const endCy = (endOut.y + endIn.y) / 2;
   const endDeg = tanAngle * 180 / Math.PI;
-  const f2 = drawRotatedFlange(endCx, endCy, V_D, endDeg);
+  const f2 = drawRotatedFlange(endC.x, endC.y, V_D, endDeg);
+  
+  // Dimensions
   const dimD = drawDim(x0, y0, x0, y0 + V_D, `D=${D_real}`, 'left');
-  const valCenterR = D_real * rMult;
-  const valNeckR = valCenterR - 0.5 * D_real;
+  
+  // Radius R (Pointing to Inner Radius)
   const midAngle = startRad + sweepRad / 2;
-  const ix = cx + rInner * Math.cos(midAngle);
-  const iy = cy + rInner * Math.sin(midAngle);
-  const labelDist = rInner - 50;
+  const ix = cx + V_R_Inner * Math.cos(midAngle);
+  const iy = cy + V_R_Inner * Math.sin(midAngle);
+  
+  // Label Position (Inward from inner arc)
+  // Ensure a minimum visual gap so arrows don't look crushed
+  const labelDist = Math.max(V_R_Inner - 40, 10);
   const lx = cx + labelDist * Math.cos(midAngle);
   const ly = cy + labelDist * Math.sin(midAngle);
+  
+  // Arrow pointing FROM label TO inner arc
   const arrow = drawArrow(ix, iy, midAngle * 180 / Math.PI);
   const rLine = `<line x1="${lx}" y1="${ly}" x2="${ix}" y2="${iy}" class="dim-line" />`;
-  const rText = `<text x="${lx}" y="${ly}" class="dim-text" text-anchor="middle" dominant-baseline="middle" dy="20">R=${valNeckR.toFixed(0)}</text>`;
+  const rText = `<text x="${lx}" y="${ly}" class="dim-text" text-anchor="middle" dominant-baseline="middle" dy="20">R=${Number(valInnerR).toFixed(0)}</text>`;
 
-  const path = `<path d="${dOuter}" class="line" /><path d="${dInner}" class="line" />`;
-  return createSvg(path + seams + f1 + f2 + dimD + rLine + arrow + rText);
+  const body = `<path d="${dOuter}" class="line" /><path d="${dInner}" class="line" />`;
+  
+  return createSvg(body + centerLinePath + seams + f1 + f2 + dimD + rLine + arrow + rText);
 };
 
 export const generateTee = (params: DuctParams) => {

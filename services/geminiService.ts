@@ -10,7 +10,8 @@ import {
     generateStraightWithTaps,
     generateBlindPlate,
     generateBlastGateDamper,
-    generateAngleFlange
+    generateAngleFlange,
+    generateOffset
 } from "./ductGenerators";
 
 /**
@@ -31,6 +32,7 @@ export const generateDuctDrawing = (type: ComponentType, params: DuctParams): st
         case ComponentType.BLIND_PLATE: return generateBlindPlate(params);
         case ComponentType.BLAST_GATE_DAMPER: return generateBlastGateDamper(params);
         case ComponentType.ANGLE_FLANGE: return generateAngleFlange(params);
+        case ComponentType.OFFSET: return generateOffset(params);
         default: return "";
     }
 };

@@ -9,6 +9,16 @@ interface OrderSheetProps {
 
 const ITEMS_PER_PAGE = 6;
 
+// --- IMAGE INSTRUCTIONS ---
+// To make the logos appear when deployed to Vercel:
+// 1. Create a folder named "public" in your project root (same level as index.html).
+// 2. Place your image files inside that folder.
+// 3. Ensure they are named exactly: 
+//    - logo_acesian.png
+//    - logo_cmt.png
+//    - logo_gic_ukas.png
+// 4. Vercel/Vite will automatically serve them at the paths used below (e.g., src="/logo_acesian.png").
+
 export const OrderSheet: React.FC<OrderSheetProps> = ({ header, items, onRemoveItem }) => {
   
   // Split items into pages
@@ -49,34 +59,77 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
 
   // Layout Calculation:
   // Total Content Height (A4 minus margins): ~277mm
-  // Header: 28mm
+  // Header: 30mm (Increased for logos)
   // Info Table: 30mm (5 rows x 6mm) + 12mm (Last Row) = 42mm
   // Footer: 10mm
-  // Total Fixed: 28 + 42 + 10 = 80mm
-  // Remaining for 3 rows of items: 277 - 80 = 197mm
-  // Height per item row: 197 / 3 = ~65.6mm. Let's use 68mm to fill space snugly.
-  const ITEM_HEIGHT = "68mm";
+  // Total Fixed: 30 + 42 + 10 = 82mm
+  // Remaining for 3 rows of items: 277 - 82 = 195mm
+  // Height per item row: 195 / 3 = 65mm
+  const ITEM_HEIGHT = "65mm";
 
   return (
     <div className="a4-page text-black font-sans text-sm flex flex-col">
       {/* Main Frame Border: Fills the padded area (190mm x 277mm) */}
       <div className="w-full h-full border-2 border-black flex flex-col relative box-border">
           
-          {/* Header - Compacted Height 28mm */}
-          <div className="flex-none h-[28mm] border-b border-black overflow-hidden relative flex flex-col justify-center">
-              <div className="text-center">
-                  <h1 className="text-xl font-serif font-bold tracking-wide leading-none mb-1">Acesian Technologies Pte Ltd</h1>
-                  <div className="flex justify-center gap-4 text-[9px] text-gray-600 leading-tight">
-                     <p>Co. Reg: 200401285N</p>
-                     <p>33 Mactaggart Road #04-00, Singapore(368082)</p>
+          {/* Header - Fixed Height 30mm */}
+          <div className="flex-none h-[30mm] border-b border-black overflow-hidden relative flex flex-col">
+              {/* Top Row: Logos & Text */}
+              <div className="flex-1 flex flex-row items-center justify-between px-2 pt-1">
+                  
+                  {/* Left: Acesian Logo */}
+                  <div className="w-[25mm] h-[22mm] flex-none flex items-center justify-center">
+                      <img 
+                        src="/logo_acesian.png" 
+                        alt="Acesian" 
+                        className="w-full h-full object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} 
+                      />
                   </div>
-                  <div className="flex justify-center gap-4 text-[9px] text-gray-600 leading-tight">
-                     <p>Tel : 67575310</p>
-                     <p>Fax : 67575319</p>
-                     <p>Email : sales@acesian.com</p>
+
+                  {/* Center: Company Info */}
+                  <div className="flex-1 text-center flex flex-col justify-center">
+                      <h1 className="text-xl font-serif font-bold tracking-wide leading-none mb-0.5">Acesian Technologies Pte Ltd</h1>
+                      <div className="flex justify-center gap-1 text-[8px] text-gray-800 leading-tight">
+                        <p>Company Registration No. 200401285N</p>
+                      </div>
+                      <div className="flex justify-center gap-1 text-[8px] text-gray-800 leading-tight">
+                        <p>33 Mactaggart Road #04-00, Singapore(368082)</p>
+                      </div>
+                      <div className="flex justify-center gap-3 text-[8px] text-gray-800 leading-tight mt-0.5">
+                        <p>Tel : 67575310</p>
+                        <p>Fax : 67575319</p>
+                      </div>
+                      <div className="flex justify-center gap-1 text-[8px] text-gray-800 leading-tight">
+                        <p>E-mail : sales@acesian.com</p>
+                      </div>
                   </div>
-                  <h2 className="text-base font-bold underline mt-1">ORDER SPECIFICATION ( O.S )</h2>
-                  <div className="absolute bottom-1 right-2 text-[10px] font-bold">BY ACESIAN</div>
+
+                  {/* Right: Cert Logos */}
+                  <div className="flex-none flex items-center gap-2 h-[22mm] pr-1">
+                      {/* CMT Logo */}
+                      <img 
+                        src="/logo_cmt.png" 
+                        alt="CMT" 
+                        className="h-[16mm] w-auto object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}  
+                      />
+                      
+                      {/* GIC/UKAS Logo */}
+                      <img 
+                        src="/logo_gic_ukas.png" 
+                        alt="GIC/UKAS" 
+                        className="h-[22mm] w-auto object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}  
+                      />
+                  </div>
+              </div>
+
+              {/* Bottom Row: Title and Labels */}
+              <div className="flex-none h-[6mm] relative flex items-end justify-center pb-1">
+                  <span className="font-bold underline text-sm">ORDER SPECIFICATION ( O.S )</span>
+                  <span className="absolute left-2 bottom-0.5 text-[9px] font-bold underline">BY CUSTOMER</span>
+                  <span className="absolute right-2 bottom-0.5 text-[9px] font-bold underline">BY ACESIAN</span>
               </div>
           </div>
 

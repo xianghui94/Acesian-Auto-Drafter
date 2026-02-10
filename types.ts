@@ -1,3 +1,4 @@
+
 export enum ComponentType {
   ELBOW = "Elbow (弯头)",
   REDUCER = "Reducer (变径)",
@@ -9,7 +10,8 @@ export enum ComponentType {
   STRAIGHT_WITH_TAPS = "Straight Duct w/ Taps (直管带支管)",
   BLIND_PLATE = "Blind Plate (盲板)",
   BLAST_GATE_DAMPER = "Blast Gate Damper (插板阀)",
-  ANGLE_FLANGE = "Angle Flange (角铁法兰)"
+  ANGLE_FLANGE = "Angle Flange (角铁法兰)",
+  OFFSET = "Offset (S-Bend)"
 }
 
 export type DuctParams = {
