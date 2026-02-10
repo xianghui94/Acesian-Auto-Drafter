@@ -42,7 +42,7 @@ export const createSvg = (content: string, width: number = VIEW_BOX_SIZE, height
       .center-line { stroke: #999; stroke-width: 1; stroke-dasharray: 5,3; }
       .hidden-line { fill: none; stroke: black; stroke-width: 1; stroke-dasharray: 3,3; }
       .phantom-line { fill: none; stroke: #999; stroke-width: 0.5; stroke-dasharray: 10,2,2,2; }
-      .npt-text { fill: #9333ea; font-family: sans-serif; font-size: 16px; font-weight: bold; text-anchor: middle; paint-order: stroke fill; stroke: white; stroke-width: 3px; }
+      .npt-text { fill: #9333ea; font-family: sans-serif; font-size: ${CFG.textSize}px; font-weight: bold; text-anchor: middle; paint-order: stroke fill; stroke: white; stroke-width: 3px; }
     </style>
     ${content}
   </svg>`;
@@ -127,4 +127,42 @@ export const drawRotatedFlange = (cx: number, cy: number, length: number, angleD
     const rot = angleDeg + 90;
     
     return `<rect x="${cx - h/2}" y="${cy - thk/2}" width="${h}" height="${thk}" class="flange" transform="rotate(${rot}, ${cx}, ${cy})" />`;
+};
+
+// --- Helper: Draw Annotation Leader ---
+export const drawAnnotation = (x: number, y: number, text: string, isTop: boolean = true) => {
+    // Top annotation goes Up-Right, Bot annotation goes Down-Right
+    // Increased vertical offset to accommodate larger text (24px)
+    const dy = isTop ? -50 : 50; 
+    const x2 = x + 30;
+    const y2 = y + dy;
+    
+    // Updated to match Dimension Text Size (CFG.textSize = 24)
+    const fontSize = CFG.textSize; 
+    const lineHeight = fontSize * 1.2; 
+    const charWidth = fontSize * 0.55; 
+
+    const lines = text.split('\n');
+    const longestLine = lines.reduce((a, b) => a.length > b.length ? a : b, "");
+    const textLen = Math.max(longestLine.length * charWidth, 40);
+    
+    const x3 = x2 + textLen + 15;
+    
+    let svg = `<polyline points="${x},${y} ${x2},${y2} ${x3},${y2}" fill="none" stroke="#006400" stroke-width="2" />`;
+    
+    // Draw text lines
+    // Bottom-most line sits just above the horizontal landing
+    const baseTextY = y2 - 8;
+
+    lines.forEach((line, i) => {
+        // Reverse index logic relative to bottom
+        const offset = (lines.length - 1 - i) * lineHeight;
+        const lineY = baseTextY - offset;
+
+        svg += `<text x="${x2}" y="${lineY}" fill="#006400" font-family="sans-serif" font-size="${fontSize}" font-weight="bold" stroke="white" stroke-width="3px" paint-order="stroke fill">${line}</text>`;
+    });
+    
+    // Return total vertical height used to adjust exclusion zones
+    const totalHeight = Math.abs(dy) + (lines.length * lineHeight);
+    return { svg, height: totalHeight };
 };

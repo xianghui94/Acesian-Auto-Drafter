@@ -1,367 +1,437 @@
 import { DuctParams } from "../../types";
-import { createSvg, drawDim, drawFlange, VIEW_BOX_SIZE } from "../svgUtils";
+import { createSvg, drawDim, drawFlange, drawAnnotation, VIEW_BOX_SIZE, CFG } from "../svgUtils";
 
-export const generateStraightWithTaps = (params: DuctParams) => {
-    // Layout: Left = Top View (Plan), Right = Cross-section (Side View)
-    // Using a rectangular ViewBox to maximize zoom in the OrderSheet container (aspect ~1.8:1)
-    const VIEW_WIDTH = 850; 
-    const VIEW_HEIGHT = 550; 
-    const cy = VIEW_HEIGHT / 2;
+// --- Types & Constants ---
+type Orientation = 'TOP' | 'BOT' | 'LEFT' | 'RIGHT' | 'TOP_RIGHT' | 'BOT_RIGHT' | 'BOT_LEFT' | 'TOP_LEFT';
 
-    const d1 = params.d1 || 500;
-    const len = params.length || 1000;
-    const taps = params.taps || [];
-    const nptPorts = params.nptPorts || [];
+interface FeaturePoint {
+    dist: number;
+    label: string;
+    hasRemark: boolean;
+    orientation: Orientation;
+    type: 'tap' | 'npt';
+    diameter: number; // Scaled diameter
+    stickOut: number; // Scaled stickout length
+}
 
-    // Scale Logic - Increase base visual size by ~50%
-    const scaleFactor = 2.2;
-    const V_D = 80 * scaleFactor; 
-    const V_L = 140 * scaleFactor; 
-    const scale = V_D / d1; 
+const VIEW_WIDTH = 850;
+const VIEW_HEIGHT = 600; 
+const CY = VIEW_HEIGHT / 2;
+const SCALE_FACTOR = 2.2; 
+
+// --- Helper: Orientation Logic ---
+const getOrientation = (angle: number): Orientation => {
+    const norm = (angle % 360 + 360) % 360;
+    if (norm >= 337.5 || norm < 22.5) return 'TOP';
+    if (norm >= 22.5 && norm < 67.5) return 'TOP_RIGHT';
+    if (norm >= 67.5 && norm < 112.5) return 'RIGHT';
+    if (norm >= 112.5 && norm < 157.5) return 'BOT_RIGHT';
+    if (norm >= 157.5 && norm < 202.5) return 'BOT';
+    if (norm >= 202.5 && norm < 247.5) return 'BOT_LEFT';
+    if (norm >= 247.5 && norm < 292.5) return 'LEFT';
+    return 'TOP_LEFT';
+};
+
+// --- Helper: Draw Main Pipe Body ---
+const drawPipeBody = (xL: number, yT: number, width: number, height: number, cxRight: number, d1: number, length: number) => {
+    // Left View (Top View)
+    const xR = xL + width;
+    const yB = yT + height;
     
-    // View positions
-    const gap = 350; 
-    const cxLeft = (VIEW_WIDTH - gap) / 2; 
-    const cxRight = (VIEW_WIDTH + gap) / 2; 
+    let svg = "";
+    // Fill background to hide grid lines behind pipe
+    svg += `<rect x="${xL}" y="${yT}" width="${width}" height="${height}" class="line" fill="white" />`;
+    svg += drawFlange(xL, CY, height, true);
+    svg += drawFlange(xR, CY, height, true);
+    svg += `<line x1="${xL-5}" y1="${CY}" x2="${xR+5}" y2="${CY}" class="center-line" />`;
 
-    // --- Top View (Left) ---
-    const xL = cxLeft - V_L/2;
-    const xR = cxLeft + V_L/2;
-    const yT = cy - V_D/2;
-    const yB = cy + V_D/2;
+    // Right View (Cross Section)
+    svg += `<circle cx="${cxRight}" cy="${CY}" r="${height/2}" class="line" fill="white" />`;
+    svg += `<line x1="${cxRight-10}" y1="${CY}" x2="${cxRight+10}" y2="${CY}" stroke="black" />`;
+    svg += `<line x1="${cxRight}" y1="${CY-10}" x2="${cxRight}" y2="${CY+10}" stroke="black" />`;
 
-    // Drawing Layers
-    let bottomLayer = ""; 
-    let pipeLayer = "";   
-    let topLayer = "";    
+    // View Titles - Increased to match dimension text size
+    svg += `
+        <text x="${xL + width/2}" y="${VIEW_HEIGHT - 30}" font-weight="bold" text-anchor="middle" font-size="${CFG.textSize}" text-decoration="underline">TOP VIEW</text>
+        <text x="${cxRight}" y="${VIEW_HEIGHT - 30}" font-weight="bold" text-anchor="middle" font-size="${CFG.textSize}" text-decoration="underline">SIDE VIEW</text>
+    `;
     
-    pipeLayer += `<rect x="${xL}" y="${yT}" width="${V_L}" height="${V_D}" class="line" fill="white" />`; 
-    pipeLayer += drawFlange(xL, cy, V_D, true) + drawFlange(xR, cy, V_D, true);
-    pipeLayer += `<line x1="${xL-5}" y1="${cy}" x2="${xR+5}" y2="${cy}" class="center-line" />`;
+    // Diameter Dim (Left Side)
+    svg += drawDim(xL - 10, yT, xL - 10, yB, `Ø${d1}`, 'left');
+
+    return svg;
+};
+
+// --- Helper: Draw Top View Feature ---
+const drawFeatureTopView = (
+    tx: number, 
+    yT: number, 
+    yB: number, 
+    f: FeaturePoint,
+    pipeDiam: number
+): { svg: string, topExclusion: number, botExclusion: number } => {
+    let svg = "";
+    const r = f.diameter / 2;
+    const rMain = pipeDiam / 2;
     
-    const sortedTaps = [...taps].sort((a: any, b: any) => a.dist - b.dist);
-    const sortedNPTs = [...nptPorts].sort((a: any, b: any) => a.dist - b.dist);
+    // Saddle dip calculation
+    const safeR = Math.min(r, rMain - 2); 
+    const dip = rMain - Math.sqrt(rMain*rMain - safeR*safeR);
 
-    let featuresForDims: any[] = [];
-    sortedTaps.forEach(t => featuresForDims.push({...t, type: 'tap'}));
-    sortedNPTs.forEach(n => featuresForDims.push({...n, type: 'npt'}));
-    featuresForDims.sort((a,b) => a.dist - b.dist);
+    let topExclusion = 0; 
+    let botExclusion = 0;
 
-    // --- Render Taps ---
-    sortedTaps.forEach((tap) => {
-        const ang = (tap.angle || 0) % 360;
-        const normAngle = (ang + 360) % 360; 
-        
-        const ratio = Math.max(0, Math.min(1, tap.dist / len));
-        const tx = xL + (ratio * V_L);
-        
-        const vTapDiam = (tap.diameter * scale);
-        const vTapRad = vTapDiam / 2;
-        const vTapStickOut = 35; 
-        const vFlangeW = vTapDiam + 10;
-        const vFlangeThk = 6;
-        
-        const tapLabel = (tap.remark && tap.remark.trim() !== "") ? tap.remark : `Ø${tap.diameter}`;
+    const labelStyle = f.type === 'npt' ? 'npt-text' : 'dim-text';
+    const fontSize = CFG.textSize; // Uses global text size (24)
 
-        let orientation = 'TOP';
-        if (normAngle >= 22.5 && normAngle < 67.5) orientation = 'TOP_RIGHT';      
-        else if (normAngle >= 67.5 && normAngle < 112.5) orientation = 'RIGHT';   
-        else if (normAngle >= 112.5 && normAngle < 157.5) orientation = 'BOT_RIGHT'; 
-        else if (normAngle >= 157.5 && normAngle < 202.5) orientation = 'BOT';     
-        else if (normAngle >= 202.5 && normAngle < 247.5) orientation = 'BOT_LEFT'; 
-        else if (normAngle >= 247.5 && normAngle < 292.5) orientation = 'LEFT';    
-        else if (normAngle >= 292.5 && normAngle < 337.5) orientation = 'TOP_LEFT'; 
-        else orientation = 'TOP'; 
-
-        switch (orientation) {
-            case 'BOT': 
-                bottomLayer += `<circle cx="${tx}" cy="${cy}" r="${vTapRad}" class="hidden-line" fill="none" />`;
-                bottomLayer += `<circle cx="${tx}" cy="${cy}" r="${vTapRad + 5}" class="hidden-line" stroke-width="0.5" fill="none" />`;
-                break;
-                
-            case 'TOP': 
-                topLayer += `<circle cx="${tx}" cy="${cy}" r="${vTapRad}" class="line" fill="white" />`;
-                topLayer += `<circle cx="${tx}" cy="${cy}" r="${vTapRad + 5}" class="line" stroke-width="0.5" stroke-dasharray="2,2" fill="none" />`;
-                topLayer += `<text x="${tx}" y="${cy - vTapRad - 10}" class="dim-text" font-size="14">${tapLabel}</text>`;
-                break;
-
-            case 'LEFT': 
-                bottomLayer += `<rect x="${tx - vTapDiam/2}" y="${yT - vTapStickOut}" width="${vTapDiam}" height="${vTapStickOut}" class="line" fill="white" />`; 
-                bottomLayer += `<rect x="${tx - vFlangeW/2}" y="${yT - vTapStickOut}" width="${vFlangeW}" height="${vFlangeThk}" class="flange" />`; 
-                topLayer += `<text x="${tx}" y="${yT - vTapStickOut - 12}" class="dim-text" font-size="14">${tapLabel}</text>`;
-                break;
-
-            case 'RIGHT': 
-                bottomLayer += `<rect x="${tx - vTapDiam/2}" y="${yB}" width="${vTapDiam}" height="${vTapStickOut}" class="line" fill="white" />`; 
-                bottomLayer += `<rect x="${tx - vFlangeW/2}" y="${yB + vTapStickOut - vFlangeThk}" width="${vFlangeW}" height="${vFlangeThk}" class="flange" />`; 
-                topLayer += `<text x="${tx}" y="${yB + vTapStickOut + 18}" class="dim-text" font-size="14">${tapLabel}</text>`;
-                break;
-
-            case 'TOP_RIGHT': 
-            case 'TOP_LEFT': 
-                {
-                    const isUp = (orientation === 'TOP_LEFT');
-                    const ySurf = isUp ? cy - 0.7 * (V_D/2) : cy + 0.7 * (V_D/2);
-                    const yTip = isUp ? cy - 0.7 * (V_D/2 + vTapStickOut) : cy + 0.7 * (V_D/2 + vTapStickOut);
-                    const labelY = isUp ? yTip - 10 : yTip + 15;
-                    
-                    topLayer += `<path d="M${tx - vTapDiam/2},${ySurf} L${tx + vTapDiam/2},${ySurf} L${tx + vTapDiam/2},${yTip} L${tx - vTapDiam/2},${yTip} Z" class="line" fill="white" />`;
-                    const ry = vTapDiam/2 * 0.7; 
-                    topLayer += `<ellipse cx="${tx}" cy="${yTip}" rx="${vTapDiam/2}" ry="${ry}" class="flange" />`;
-                    topLayer += `<text x="${tx}" y="${labelY}" class="dim-text" font-size="14">${tapLabel}</text>`;
-                }
-                break;
-                
-            case 'BOT_RIGHT': 
-            case 'BOT_LEFT': 
-                {
-                    const isUp = (orientation === 'BOT_LEFT');
-                    const ySurf = isUp ? cy - 0.7 * (V_D/2) : cy + 0.7 * (V_D/2);
-                    const yTip = isUp ? cy - 0.7 * (V_D/2 + vTapStickOut) : cy + 0.7 * (V_D/2 + vTapStickOut);
-                    
-                    bottomLayer += `<path d="M${tx - vTapDiam/2},${ySurf} L${tx - vTapDiam/2},${yTip}" class="hidden-line" />`;
-                    bottomLayer += `<path d="M${tx + vTapDiam/2},${ySurf} L${tx + vTapDiam/2},${yTip}" class="hidden-line" />`;
-                    
-                    const ry = vTapDiam/2 * 0.7; 
-                    bottomLayer += `<ellipse cx="${tx}" cy="${yTip}" rx="${vTapDiam/2}" ry="${ry}" class="hidden-line" fill="none" />`;
-                }
-                break;
+    if (f.orientation === 'TOP') {
+        // Pointing at viewer: Circle + Flange
+        svg += `<circle cx="${tx}" cy="${CY}" r="${r}" class="line" fill="white" />`;
+        if (f.type === 'tap') {
+            const rFlange = r + 8;
+            svg += `<circle cx="${tx}" cy="${CY}" r="${rFlange}" class="line" fill="none" />`;
+            // Bolt circle indication
+            svg += `<circle cx="${tx}" cy="${CY}" r="${r + 4}" class="phantom-line" stroke-width="0.5" />`;
         }
-    });
-
-    // --- Render NPT Ports ---
-    sortedNPTs.forEach((port) => {
-        const ang = (port.angle || 0) % 360;
-        const normAngle = (ang + 360) % 360;
         
-        const ratio = Math.max(0, Math.min(1, port.dist / len));
-        const tx = xL + (ratio * V_L);
-
-        const vPortRad = 10;
-        const vPortStickOut = 14;
-        
-        const portLabel = (port.remark && port.remark.trim() !== "") ? port.remark : `Ø${port.size} NPT TP`;
-
-        let orientation = 'TOP';
-        if (normAngle >= 45 && normAngle < 135) orientation = 'RIGHT';      
-        else if (normAngle >= 135 && normAngle < 225) orientation = 'BOT';  
-        else if (normAngle >= 225 && normAngle < 315) orientation = 'LEFT'; 
-        else orientation = 'TOP'; 
-
-        switch (orientation) {
-            case 'TOP': 
-                topLayer += `<circle cx="${tx}" cy="${cy}" r="${vPortRad}" class="line" fill="white" />`;
-                topLayer += `<circle cx="${tx}" cy="${cy}" r="${vPortRad/2}" class="line" fill="none" />`; 
-                topLayer += `<line x1="${tx}" y1="${cy-vPortRad}" x2="${tx+20}" y2="${cy-40}" class="line" stroke-width="0.5" />`;
-                topLayer += `<line x1="${tx+20}" y1="${cy-40}" x2="${tx+50}" y2="${cy-40}" class="line" stroke-width="0.5" />`;
-                topLayer += `<text x="${tx+50}" y="${cy-45}" class="npt-text" text-anchor="end">${portLabel}</text>`;
-                break;
-
-            case 'BOT': 
-                bottomLayer += `<circle cx="${tx}" cy="${cy}" r="${vPortRad}" class="hidden-line" fill="none" />`;
-                bottomLayer += `<circle cx="${tx}" cy="${cy}" r="${vPortRad/2}" class="hidden-line" fill="none" />`;
-                break;
-
-            case 'LEFT': 
-                bottomLayer += `<rect x="${tx - vPortRad/2}" y="${yT - vPortStickOut}" width="${vPortRad}" height="${vPortStickOut}" class="line" fill="white" />`;
-                topLayer += `<text x="${tx}" y="${yT - vPortStickOut - 6}" class="npt-text">${portLabel}</text>`;
-                break;
+        if (f.hasRemark) {
+            // Annotation leader starting from top of circle
+            const startY = CY - r;
+            const res = drawAnnotation(tx, startY, f.label, true);
+            svg += res.svg;
             
-            case 'RIGHT': 
-                bottomLayer += `<rect x="${tx - vPortRad/2}" y="${yB}" width="${vPortRad}" height="${vPortStickOut}" class="line" fill="white" />`;
-                topLayer += `<text x="${tx}" y="${yB + vPortStickOut + 14}" class="npt-text">${portLabel}</text>`;
-                break;
-        }
-    });
-
-    // --- Dimensions Logic ---
-    let featureDims = "";
-    
-    const distGroups = new Map<number, any[]>();
-    featuresForDims.forEach(f => {
-        if (!distGroups.has(f.dist)) distGroups.set(f.dist, []);
-        distGroups.get(f.dist).push(f);
-    });
-    
-    const sortedDists = Array.from(distGroups.keys()).sort((a,b) => a - b);
-    
-    const topDims: any[] = [];
-    const botDims: any[] = [];
-    let preferBottom = true; 
-
-    sortedDists.forEach(d => {
-        const group = distGroups.get(d);
-        if (group.length > 1) {
-            group.forEach((item: any, i: number) => {
-                if (i % 2 === 0) botDims.push(item);
-                else topDims.push(item);
-            });
+            // Check if annotation goes higher than pipe wall
+            const highestPoint = startY - res.height;
+            if (highestPoint < yT) {
+                topExclusion = (yT - highestPoint) + 20;
+            }
         } else {
-            if (preferBottom) botDims.push(group[0]);
-            else topDims.push(group[0]);
-            preferBottom = !preferBottom; 
+            // Increased offset for larger text
+            svg += `<text x="${tx}" y="${CY - r - 30}" class="${labelStyle}" font-size="${fontSize}">${f.label}</text>`;
+        }
+    } 
+    else if (f.orientation === 'BOT') {
+        svg += `<circle cx="${tx}" cy="${CY}" r="${r}" class="hidden-line" fill="none" />`;
+    } 
+    else if (f.orientation === 'LEFT' || f.orientation === 'TOP_LEFT' || f.orientation === 'BOT_LEFT') {
+        // "Left" in clock orientation means Top in Plan view (270 deg)
+        const yTip = yT - f.stickOut;
+        
+        // Neck Lines
+        svg += `<line x1="${tx - r}" y1="${yTip}" x2="${tx - r}" y2="${yT}" class="line" />`;
+        svg += `<line x1="${tx + r}" y1="${yTip}" x2="${tx + r}" y2="${yT}" class="line" />`;
+        
+        // Saddle Curve
+        svg += `<path d="M${tx - r},${yT} Q${tx},${yT + dip*1.8} ${tx + r},${yT}" class="line" fill="white" />`;
+
+        // Flange / Coupling at Tip
+        if (f.type === 'tap') {
+            const fw = f.diameter + 14;
+            const fh = 6;
+            svg += `<rect x="${tx - fw/2}" y="${yTip}" width="${fw}" height="${fh}" class="flange" fill="white" />`;
+        } else {
+            const cw = f.diameter + 6;
+            svg += `<rect x="${tx - cw/2}" y="${yTip}" width="${cw}" height="${10}" class="line" fill="white" />`;
+        }
+
+        if (f.hasRemark) {
+            const res = drawAnnotation(tx, yTip, f.label, true);
+            svg += res.svg;
+            topExclusion = f.stickOut + res.height;
+        } else {
+            // Increased offset for larger text
+            svg += `<text x="${tx}" y="${yTip - 30}" class="${labelStyle}" font-size="${fontSize}">${f.label}</text>`;
+            topExclusion = f.stickOut + 45; // Extra buffer for text
+        }
+    }
+    else if (f.orientation === 'RIGHT' || f.orientation === 'TOP_RIGHT' || f.orientation === 'BOT_RIGHT') {
+        // "Right" in clock means Bottom in Plan view (90 deg)
+        const yTip = yB + f.stickOut;
+        
+        // Neck Lines
+        svg += `<line x1="${tx - r}" y1="${yTip}" x2="${tx - r}" y2="${yB}" class="line" />`;
+        svg += `<line x1="${tx + r}" y1="${yTip}" x2="${tx + r}" y2="${yB}" class="line" />`;
+        
+        // Saddle Curve
+        svg += `<path d="M${tx - r},${yB} Q${tx},${yB - dip*1.8} ${tx + r},${yB}" class="line" fill="white" />`;
+
+        // Flange / Coupling at Tip
+        if (f.type === 'tap') {
+            const fw = f.diameter + 14;
+            const fh = 6;
+            svg += `<rect x="${tx - fw/2}" y="${yTip - fh}" width="${fw}" height="${fh}" class="flange" fill="white" />`;
+        } else {
+            const cw = f.diameter + 6;
+            svg += `<rect x="${tx - cw/2}" y="${yTip - 10}" width="${cw}" height="${10}" class="line" fill="white" />`;
+        }
+        
+        if (f.hasRemark) {
+            const res = drawAnnotation(tx, yTip, f.label, false);
+            svg += res.svg;
+            botExclusion = f.stickOut + res.height;
+        } else {
+            // Increased offset for larger text
+            svg += `<text x="${tx}" y="${yTip + 35}" class="${labelStyle}" font-size="${fontSize}">${f.label}</text>`;
+            botExclusion = f.stickOut + 45; // Extra buffer for text
+        }
+    }
+
+    return { svg, topExclusion, botExclusion };
+};
+
+// --- Helper: Draw Side View Feature ---
+const drawFeatureSideView = (cx: number, cy: number, f: FeaturePoint, pipeRad: number) => {
+    let svg = "";
+    
+    let angleDeg = 0;
+    switch (f.orientation) {
+        case 'TOP': angleDeg = 0; break; 
+        case 'TOP_RIGHT': angleDeg = 45; break;
+        case 'RIGHT': angleDeg = 90; break;
+        case 'BOT_RIGHT': angleDeg = 135; break;
+        case 'BOT': angleDeg = 180; break;
+        case 'BOT_LEFT': angleDeg = 225; break;
+        case 'LEFT': angleDeg = 270; break;
+        case 'TOP_LEFT': angleDeg = 315; break;
+    }
+    
+    const rad = (angleDeg - 90) * Math.PI / 180;
+    const rStart = pipeRad;
+    const rEnd = pipeRad + f.stickOut;
+
+    // Vector for center line
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    // Perpendicular vector for half-width
+    const pCos = Math.cos(rad + Math.PI/2);
+    const pSin = Math.sin(rad + Math.PI/2);
+    const hw = f.diameter / 2;
+
+    // Neck Points
+    const p1 = { x: cx + rStart*cos + hw*pCos, y: cy + rStart*sin + hw*pSin };
+    const p2 = { x: cx + rEnd*cos + hw*pCos,   y: cy + rEnd*sin + hw*pSin };
+    const p3 = { x: cx + rEnd*cos - hw*pCos,   y: cy + rEnd*sin - hw*pSin };
+    const p4 = { x: cx + rStart*cos - hw*pCos, y: cy + rStart*sin - hw*pSin };
+
+    svg += `<path d="M${p1.x},${p1.y} L${p2.x},${p2.y} L${p3.x},${p3.y} L${p4.x},${p4.y} Z" class="line" fill="white" />`;
+
+    // Flange (Rectangular box at end)
+    if (f.type === 'tap') {
+        const fh = 6;
+        const fw = f.diameter + 14;
+        const hfw = fw/2;
+        
+        // Flange corners relative to end center
+        const fFaceC = { x: cx + rEnd*cos, y: cy + rEnd*sin };
+        const fBackC = { x: cx + (rEnd-fh)*cos, y: cy + (rEnd-fh)*sin };
+        
+        const f1 = { x: fFaceC.x + hfw*pCos, y: fFaceC.y + hfw*pSin };
+        const f2 = { x: fBackC.x + hfw*pCos, y: fBackC.y + hfw*pSin };
+        const f3 = { x: fBackC.x - hfw*pCos, y: fBackC.y - hfw*pSin };
+        const f4 = { x: fFaceC.x - hfw*pCos, y: fFaceC.y - hfw*pSin };
+        
+        svg += `<path d="M${f1.x},${f1.y} L${f2.x},${f2.y} L${f3.x},${f3.y} L${f4.x},${f4.y} Z" class="flange" fill="white" stroke-width="2" />`;
+    }
+
+    // Leader line to label
+    const labelR = rEnd + 45; // Increased length for larger text
+    const lx = cx + labelR * cos;
+    const ly = cy + labelR * sin;
+    
+    // Updated font size to match CFG.textSize (24px)
+    svg += `<text x="${lx}" y="${ly}" class="dim-text" font-size="${CFG.textSize}" dominant-baseline="middle" text-anchor="middle">${angleDeg}°</text>`;
+    svg += `<line x1="${cx}" y1="${cy}" x2="${p2.x}" y2="${p2.y}" stroke="#999" stroke-dasharray="2,2" stroke-width="0.5" />`;
+
+    return svg;
+};
+
+// --- Helper: Dimension Stacking ---
+const drawDimensionStack = (
+    features: FeaturePoint[], 
+    xStart: number, 
+    viewWidth: number, 
+    totalLength: number,
+    yRefTop: number,
+    yRefBot: number,
+    minClearanceTop: number,
+    minClearanceBot: number
+) => {
+    let svg = "";
+    
+    // Group logic ...
+    const topDims: typeof features = [];
+    const botDims: typeof features = [];
+
+    features.forEach(f => {
+        if (f.orientation === 'LEFT' || f.orientation === 'TOP_LEFT' || f.orientation === 'BOT_LEFT') {
+            botDims.push(f);
+        } else if (f.orientation === 'RIGHT' || f.orientation === 'TOP_RIGHT' || f.orientation === 'BOT_RIGHT') {
+            topDims.push(f);
+        } else {
+            if (topDims.length <= botDims.length) topDims.push(f);
+            else botDims.push(f);
         }
     });
 
-    const renderStackedDims = (items: any[], side: 'top' | 'bottom') => {
-        let svg = "";
-        const levels: number[] = []; 
+    const renderStack = (items: typeof features, side: 'top' | 'bottom') => {
+        items.sort((a,b) => a.dist - b.dist);
+
+        const tiers: number[] = [];
+        const TEXT_WIDTH_GAP = 70; 
+        const LEVEL_HEIGHT = 25;
+
+        // Base Y start (clearance from pipe/features)
+        const baseOffset = 20; // Reduced slightly since minClearance includes text buffer now
+        const clearance = side === 'top' ? minClearanceTop : minClearanceBot;
+        const startY = side === 'top' 
+            ? yRefTop - clearance - baseOffset
+            : yRefBot + clearance + baseOffset;
+
+        let stackSvg = "";
 
         items.forEach(item => {
-            const ratio = Math.max(0, Math.min(1, item.dist / len));
-            const tx = xL + (ratio * V_L);
+            const ratio = item.dist / totalLength;
+            const tx = xStart + (ratio * viewWidth);
             
-            let level = 0;
-            while(true) {
-                const lastX = levels[level];
-                if (lastX === undefined) {
-                    levels[level] = tx;
+            let chosenTier = 0;
+            while (true) {
+                const lastX = tiers[chosenTier] || -9999;
+                if (tx > lastX + TEXT_WIDTH_GAP) {
+                    tiers[chosenTier] = tx;
                     break;
                 }
-                if (Math.abs(tx - lastX) > 60) { 
-                    levels[level] = tx;
-                    break;
-                }
-                level++;
+                chosenTier++;
             }
+
+            const yLevel = side === 'top' 
+                ? startY - (chosenTier * LEVEL_HEIGHT)
+                : startY + (chosenTier * LEVEL_HEIGHT);
+
+            const yPipeCenter = CY;
             
-            const baseOff = 60;
-            const levelStep = 25; 
-            const totalOff = baseOff + (level * levelStep);
-            
-            const yOrg = (side === 'top') ? yT : yB;
-            const yDim = (side === 'top') ? yOrg - totalOff : yOrg + totalOff;
-            
-            svg += `<line x1="${tx}" y1="${yOrg}" x2="${tx}" y2="${yDim}" class="phantom-line" stroke-width="0.5" />`;
-            svg += `<line x1="${xL}" y1="${yOrg}" x2="${xL}" y2="${yDim}" class="line" stroke-width="0.5" />`;
-            svg += drawDim(xL, yDim, tx, yDim, `${item.dist}`, side, 0);
+            stackSvg += `<line x1="${tx}" y1="${yPipeCenter}" x2="${tx}" y2="${yLevel}" class="phantom-line" stroke-width="0.5" opacity="0.5" />`;
+            stackSvg += drawDim(xStart, yLevel, tx, yLevel, item.dist.toString(), side, 0);
         });
-        
-        return svg;
+
+        const maxTier = tiers.length > 0 ? tiers.length - 1 : 0;
+        const finalY = side === 'top'
+            ? startY - (maxTier * LEVEL_HEIGHT)
+            : startY + (maxTier * LEVEL_HEIGHT);
+            
+        return { svg: stackSvg, finalY };
     };
 
-    featureDims += renderStackedDims(topDims, 'top');
-    featureDims += renderStackedDims(botDims, 'bottom');
+    const topResult = renderStack(topDims, 'top');
+    const botResult = renderStack(botDims, 'bottom');
 
-    const dimD = drawDim(xL - 10, yT, xL - 10, yB, `Ø${d1}`, 'left');
+    svg += topResult.svg;
+    svg += botResult.svg;
+
+    const totalDimY = botResult.finalY + 40;
+    svg += drawDim(xStart, totalDimY, xStart + viewWidth, totalDimY, `L=${totalLength}`, 'bottom', 0);
+
+    return svg;
+};
+
+// --- Main Generator ---
+export const generateStraightWithTaps = (params: DuctParams) => {
+    const d1 = params.d1 || 500;
+    const len = params.length || 1000;
     
-    const botLevels = Math.ceil(botDims.length / 2); 
-    const dimL_Y = yB + 60 + (botLevels * 25) + 30; 
-    const dimL = drawDim(xL, dimL_Y, xR, dimL_Y, `L=${len}`, 'bottom', 0);
-
-    const cutX = xL + 20;
-    const cutTopY = yT - 40; 
-    const cutBotY = yB + 40;
-    const cutLine = `
-        <line x1="${cutX}" y1="${cutTopY}" x2="${cutX}" y2="${cutBotY}" class="phantom-line" stroke-width="2" />
-        <line x1="${cutX}" y1="${cutTopY}" x2="${cutX}" y2="${cutTopY+15}" stroke="black" stroke-width="3" />
-        <line x1="${cutX}" y1="${cutBotY}" x2="${cutX}" y2="${cutBotY-15}" stroke="black" stroke-width="3" />
-        <polyline points="${cutX-8},${cutTopY} ${cutX},${cutTopY} ${cutX},${cutTopY+8}" fill="none" stroke="black" stroke-width="3" />
-        <polyline points="${cutX-8},${cutBotY} ${cutX},${cutBotY} ${cutX},${cutBotY-8}" fill="none" stroke="black" stroke-width="3" />
-        <text x="${cutX}" y="${cutTopY-8}" font-weight="bold" text-anchor="middle" font-size="18">A</text>
-        <text x="${cutX}" y="${cutBotY+20}" font-weight="bold" text-anchor="middle" font-size="18">A</text>
-    `;
-
-    // --- Right View Visuals ---
-    const circle = `<circle cx="${cxRight}" cy="${cy}" r="${V_D/2}" class="line" />`;
-    const centerMark = `<line x1="${cxRight-10}" y1="${cy}" x2="${cxRight+10}" y2="${cy}" stroke="black" /><line x1="${cxRight}" y1="${cy-10}" x2="${cxRight}" y2="${cy+10}" stroke="black" />`;
+    // Visual Scales
+    const V_D = 80 * SCALE_FACTOR;
+    const V_L = 140 * SCALE_FACTOR;
     
-    const seamAngle = params.seamAngle !== undefined ? params.seamAngle : 0;
+    // View Layout
+    const gap = 350;
+    const cxLeft = (VIEW_WIDTH - gap) / 2;
+    const cxRight = (VIEW_WIDTH + gap) / 2;
+    
+    const xL = cxLeft - V_L/2;
+    const xR = cxLeft + V_L/2;
+    const yT = CY - V_D/2;
+    const yB = CY + V_D/2;
+
+    const features: FeaturePoint[] = [];
+    
+    (params.taps || []).forEach((t: any) => {
+        features.push({
+            dist: t.dist,
+            label: t.remark || `Ø${t.diameter}`,
+            hasRemark: !!t.remark,
+            orientation: getOrientation(t.angle || 0),
+            type: 'tap',
+            diameter: (t.diameter / d1) * V_D,
+            stickOut: 35
+        });
+    });
+
+    (params.nptPorts || []).forEach((n: any) => {
+        features.push({
+            dist: n.dist,
+            label: n.remark || `Ø${n.size} NPT`,
+            hasRemark: !!n.remark,
+            orientation: getOrientation(n.angle || 0),
+            type: 'npt',
+            diameter: 20, 
+            stickOut: 15
+        });
+    });
+
+    let svgContent = "";
+    
+    svgContent += drawPipeBody(xL, yT, V_L, V_D, cxRight, d1, len);
+
+    let maxStickTop = 0;
+    let maxStickBot = 0;
+
+    features.forEach(f => {
+        const ratio = Math.max(0, Math.min(1, f.dist / len));
+        const tx = xL + (ratio * V_L);
+        
+        const res = drawFeatureTopView(tx, yT, yB, f, V_D);
+        svgContent += res.svg;
+        
+        if (res.topExclusion > maxStickTop) maxStickTop = res.topExclusion;
+        if (res.botExclusion > maxStickBot) maxStickBot = res.botExclusion;
+    });
+
+    features.forEach(f => {
+        svgContent += drawFeatureSideView(cxRight, CY, f, V_D/2);
+    });
+
+    const seamAngle = params.seamAngle || 0;
     const sRad = (seamAngle - 90) * Math.PI / 180;
     const sx = cxRight + (V_D/2) * Math.cos(sRad);
-    const sy = cy + (V_D/2) * Math.sin(sRad);
-    const seamDot = `<circle cx="${sx}" cy="${sy}" r="5" fill="black" />`;
-
-    let tapVisualsRight = "";
+    const sy = CY + (V_D/2) * Math.sin(sRad);
     
-    sortedTaps.forEach(tap => {
-        const angle = tap.angle || 0;
-        const rad = (angle - 90) * Math.PI / 180;
-        const R = V_D/2;
-        const stubLen = 35;
-        
-        const vTapDiam = (tap.diameter * scale);
-        
-        const x1 = cxRight + R * Math.cos(rad);
-        const y1 = cy + R * Math.sin(rad);
-        const x2 = cxRight + (R + stubLen) * Math.cos(rad);
-        const y2 = cy + (R + stubLen) * Math.sin(rad);
-        
-        const px = Math.cos(rad + Math.PI/2) * (vTapDiam/2);
-        const py = Math.sin(rad + Math.PI/2) * (vTapDiam/2);
-        const p1x = x1 + px, p1y = y1 + py;
-        const p4x = x2 + px, p4y = y2 + py;
-        const p2x = x1 - px, p2y = y1 - py;
-        const p3x = x2 - px, p3y = y2 - py;
-        
-        tapVisualsRight += `<path d="M${p1x},${p1y} L${p4x},${p4y} M${p2x},${p2y} L${p3x},${p3y}" class="line" />`;
-        
-        const vFlangeW = vTapDiam + 10;
-        const fx = Math.cos(rad + Math.PI/2) * (vFlangeW/2);
-        const fy = Math.sin(rad + Math.PI/2) * (vFlangeW/2);
-        const f1x = x2 - fx, f1y = y2 - fy;
-        const f2x = x2 + fx, f2y = y2 + fy;
-        
-        tapVisualsRight += `<line x1="${f1x}" y1="${f1y}" x2="${f2x}" y2="${f2y}" class="flange" stroke-width="2" />`;
-        
-        const labelR = R + stubLen + 25;
-        const lx = cxRight + labelR * Math.cos(rad);
-        const ly = cy + labelR * Math.sin(rad);
-        tapVisualsRight += `<text x="${lx}" y="${ly}" class="dim-text" font-size="14" dominant-baseline="middle">${angle}°</text>`;
-        tapVisualsRight += `<line x1="${cxRight}" y1="${cy}" x2="${x1}" y2="${y1}" stroke="#999" stroke-dasharray="2,2" stroke-width="0.5" />`;
-    });
+    // Increased dot size by 50% (r=4 -> r=6)
+    svgContent += `<circle cx="${sx}" cy="${sy}" r="6" fill="black" />`;
 
-    sortedNPTs.forEach(port => {
-        const angle = port.angle || 0;
-        const rad = (angle - 90) * Math.PI / 180;
-        const R = V_D/2;
-        const stubLen = 16; 
-        const vPortRad = 10;
-
-        const x1 = cxRight + R * Math.cos(rad);
-        const y1 = cy + R * Math.sin(rad);
-        const x2 = cxRight + (R + stubLen) * Math.cos(rad);
-        const y2 = cy + (R + stubLen) * Math.sin(rad);
-        
-        const px = Math.cos(rad + Math.PI/2) * (vPortRad);
-        const py = Math.sin(rad + Math.PI/2) * (vPortRad);
-        
-        const p1x = x1 + px, p1y = y1 + py;
-        const p4x = x2 + px, p4y = y2 + py;
-        const p2x = x1 - px, p2y = y1 - py;
-        const p3x = x2 - px, p3y = y2 - py;
-        
-        tapVisualsRight += `<path d="M${p1x},${p1y} L${p4x},${p4y} L${p3x},${p3y} L${p2x},${p2y} Z" class="line" fill="white" />`;
-        
-        tapVisualsRight += `<line x1="${p4x}" y1="${p4y}" x2="${p3x}" y2="${p3y}" stroke="black" stroke-width="2" />`;
-
-        const labelR = R + stubLen + 20;
-        const lx = cxRight + labelR * Math.cos(rad);
-        const ly = cy + labelR * Math.sin(rad);
-        tapVisualsRight += `<text x="${lx}" y="${ly}" class="npt-text" dominant-baseline="middle">${angle}°</text>`;
-        tapVisualsRight += `<line x1="${cxRight}" y1="${cy}" x2="${x1}" y2="${y1}" stroke="#999" stroke-dasharray="2,2" stroke-width="0.5" />`;
-    });
-    
-    const degLabels = `
-        <text x="${cxRight}" y="${cy - V_D/2 - 16}" font-size="14" text-anchor="middle">0°</text>
-        <text x="${cxRight + V_D/2 + 16}" y="${cy}" font-size="14" dominant-baseline="middle">90°</text>
-        <text x="${cxRight}" y="${cy + V_D/2 + 16}" font-size="14" text-anchor="middle">180°</text>
-        <text x="${cxRight - V_D/2 - 16}" y="${cy}" font-size="14" text-anchor="end" dominant-baseline="middle">270°</text>
-    `;
-
-    const viewLabels = `
-        <text x="${cxLeft}" y="${cy + V_D/2 + 160}" font-weight="bold" text-anchor="middle" font-size="18" text-decoration="underline">TOP VIEW</text>
-        <text x="${cxRight}" y="${cy + V_D/2 + 160}" font-weight="bold" text-anchor="middle" font-size="18" text-decoration="underline">SIDE VIEW</text>
-    `;
-
-    return createSvg(
-        bottomLayer + 
-        pipeLayer + 
-        topLayer +
-        
-        dimD + cutLine + featureDims + dimL +
-        circle + centerMark + seamDot + tapVisualsRight + degLabels + viewLabels,
-        VIEW_WIDTH,
-        VIEW_HEIGHT
+    svgContent += drawDimensionStack(
+        features, 
+        xL, 
+        V_L, 
+        len, 
+        yT, 
+        yB, 
+        maxStickTop, 
+        maxStickBot
     );
+    
+    // Cut Lines (A-A)
+    const cutX = xL + 25;
+    // Push cut lines clear of dimensions if possible, or just standard
+    const cutY1 = yT - 40 - maxStickTop;
+    const cutY2 = yB + 40 + maxStickBot;
+    svgContent += `
+        <line x1="${cutX}" y1="${cutY1}" x2="${cutX}" y2="${cutY2}" class="phantom-line" stroke-width="2" />
+        <polyline points="${cutX-8},${cutY1} ${cutX},${cutY1} ${cutX},${cutY1+8}" fill="none" stroke="black" stroke-width="3" />
+        <polyline points="${cutX-8},${cutY2} ${cutX},${cutY2} ${cutX},${cutY2-8}" fill="none" stroke="black" stroke-width="3" />
+        <text x="${cutX}" y="${cutY1-8}" font-weight="bold" text-anchor="middle" font-size="${CFG.textSize}">A</text>
+        <text x="${cutX}" y="${cutY2+20}" font-weight="bold" text-anchor="middle" font-size="${CFG.textSize}">A</text>
+    `;
+
+    return createSvg(svgContent, VIEW_WIDTH, VIEW_HEIGHT);
 };

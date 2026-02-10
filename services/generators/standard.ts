@@ -1,5 +1,5 @@
 import { DuctParams } from "../../types";
-import { createSvg, drawDim, drawFlange, drawRotatedFlange, drawArrow, VIEW_BOX_SIZE, V_CONSTANTS } from "../svgUtils";
+import { createSvg, drawDim, drawFlange, drawRotatedFlange, drawArrow, drawAnnotation, VIEW_BOX_SIZE, V_CONSTANTS } from "../svgUtils";
 
 const { LEN: V_LEN, DIAM: V_DIAM, DIAM_LG: V_DIAM_LG, DIAM_SM: V_DIAM_SM, REDUCER_STRAIGHT: V_REDUCER_STRAIGHT, BRANCH_W: V_BRANCH_W, BRANCH_H: V_BRANCH_H, TRANS_LEN: V_TRANS_LEN, TRANS_TAN: V_TRANS_TAN } = V_CONSTANTS;
 
@@ -156,10 +156,40 @@ export const generateElbow = (params: DuctParams) => {
   }
 
   // Flanges
+  // Start Flange (Vertical)
   const f1 = drawFlange(x0, y0 + V_D/2, V_D, true);
+  
+  // End Flange (Rotated)
   const endDeg = tanAngle * 180 / Math.PI;
   const f2 = drawRotatedFlange(endC.x, endC.y, V_D, endDeg);
   
+  // Remarks
+  let remark1 = "";
+  if (params.flangeRemark1) {
+      // Point to top of start flange (x0, y0)
+      remark1 = drawAnnotation(x0, y0, params.flangeRemark1, true).svg;
+  }
+  
+  let remark2 = "";
+  if (params.flangeRemark2) {
+      // Point to outer edge of end flange
+      // End flange center: endC
+      // Tangent Angle (Direction of flow): tanAngle
+      // Flange direction: tanAngle + 90 deg
+      // We want to point to the "Outer" side relative to the bend
+      
+      const fRad = V_D/2; 
+      // Perpendicular vector for flange direction
+      // CHANGED: Use -PI/2 to get Outer normal vector instead of Inner
+      const px = Math.cos(tanAngle - Math.PI/2);
+      const py = Math.sin(tanAngle - Math.PI/2);
+      
+      const fx = endC.x + fRad * px; 
+      const fy = endC.y + fRad * py;
+      
+      remark2 = drawAnnotation(fx, fy, params.flangeRemark2, false).svg;
+  }
+
   // Dimensions
   const dimD = drawDim(x0, y0, x0, y0 + V_D, `D=${D_real}`, 'left');
   
@@ -169,7 +199,6 @@ export const generateElbow = (params: DuctParams) => {
   const iy = cy + V_R_Inner * Math.sin(midAngle);
   
   // Label Position (Inward from inner arc)
-  // Ensure a minimum visual gap so arrows don't look crushed
   const labelDist = Math.max(V_R_Inner - 40, 10);
   const lx = cx + labelDist * Math.cos(midAngle);
   const ly = cy + labelDist * Math.sin(midAngle);
@@ -181,7 +210,7 @@ export const generateElbow = (params: DuctParams) => {
 
   const body = `<path d="${dOuter}" class="line" /><path d="${dInner}" class="line" />`;
   
-  return createSvg(body + centerLinePath + seams + f1 + f2 + dimD + rLine + arrow + rText);
+  return createSvg(body + centerLinePath + seams + f1 + f2 + dimD + rLine + arrow + rText + remark1 + remark2);
 };
 
 export const generateTee = (params: DuctParams) => {

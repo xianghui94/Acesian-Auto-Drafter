@@ -9,6 +9,7 @@ interface ItemBuilderProps {
 
 export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
   const [componentType, setComponentType] = useState<ComponentType>(ComponentType.ELBOW);
+  const [isConfigOpen, setIsConfigOpen] = useState(true);
   
   // Params
   const [params, setParams] = useState<DuctParams>({ d1: 500, angle: 90 });
@@ -29,7 +30,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
       case ComponentType.ELBOW: 
         // Initial defaults for Elbow
         // Default D=500. For D>=200, we use Throat R = 0.5D -> 250
-        setParams({ d1: 500, angle: 90, radius: 250 }); 
+        setParams({ d1: 500, angle: 90, radius: 250, flangeRemark1: "", flangeRemark2: "" }); 
         break;
       case ComponentType.REDUCER: setParams({ d1: 500, d2: 300, length: 500 }); break;
       case ComponentType.STRAIGHT: setParams({ d1: 300, length: 1000 }); break;
@@ -253,65 +254,89 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
   };
 
   return (
-    <div className="no-print bg-white border-b border-cad-200 p-4 shadow-sm z-20">
-      <div className="flex flex-col xl:flex-row gap-6">
+    <div className="no-print bg-white border-b border-cad-200 p-4 shadow-sm z-20 transition-all duration-300">
+      <div className="flex flex-col gap-4">
         
-        {/* Left: Configuration */}
-        <div className="flex-1 space-y-4">
+        {/* Header / Component Selector Row */}
+        <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
                 <select 
                     value={componentType}
                     onChange={(e) => setComponentType(e.target.value as ComponentType)}
-                    className="p-2 border border-cad-300 rounded font-semibold text-cad-800"
+                    className="p-2 border border-cad-300 rounded font-semibold text-cad-800 focus:ring-2 focus:ring-blue-500 outline-none"
                 >
                     {Object.values(ComponentType).map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
                 <div className="h-6 w-px bg-cad-200"></div>
-                <h3 className="text-sm font-bold text-cad-500 uppercase">Item Config</h3>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {renderParamsInputs()}
-                <TextInput label="Material" value={meta.material} onChange={v => setMeta(m => ({...m, material: v}))} />
-                <TextInput label="Thk (mm)" value={meta.thickness} onChange={v => setMeta(m => ({...m, thickness: v}))} />
-                
-                {/* Coating Dropdown */}
-                <div>
-                    <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Coating</label>
-                    <select
-                        value={meta.coating}
-                        onChange={(e) => setMeta(m => ({...m, coating: e.target.value}))}
-                        className="w-full p-1.5 border border-cad-300 rounded text-sm bg-white"
-                    >
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                        <option value="N/A">N/A</option>
-                    </select>
-                </div>
-
-                <TextInput label="Tag No" value={meta.tagNo} onChange={v => setMeta(m => ({...m, tagNo: v}))} />
-                <NumInput label="Qty" value={meta.qty} onChange={v => setMeta(m => ({...m, qty: v}))} />
-            </div>
-
-            {/* Notes Input */}
-            <div>
-               <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Notes</label>
-               <input 
-                  type="text" 
-                  value={meta.notes}
-                  onChange={(e) => setMeta(m => ({...m, notes: e.target.value}))}
-                  className="w-full p-1.5 border border-cad-300 rounded text-sm"
-                  placeholder="Additional manufacturing notes..."
-               />
+                <h3 className="text-sm font-bold text-cad-500 uppercase flex items-center gap-2">
+                    Item Config
+                </h3>
             </div>
             
-            <div className="flex justify-end pt-2">
-                <button 
-                    onClick={handleAdd}
-                    className="px-8 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold text-sm shadow-sm flex items-center gap-2 transition-all active:scale-95"
-                >
-                    + Add Item to Order Sheet
-                </button>
+            <button 
+                onClick={() => setIsConfigOpen(!isConfigOpen)}
+                className="text-cad-500 hover:text-cad-800 text-xs font-bold uppercase tracking-wider flex items-center gap-1 p-2 rounded hover:bg-cad-50"
+            >
+                {isConfigOpen ? (
+                    <>
+                        <span>Hide Config</span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                    </>
+                ) : (
+                    <>
+                        <span>Show Config</span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </>
+                )}
+            </button>
+        </div>
+
+        {/* Collapsible Content */}
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isConfigOpen ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}`}>
+            <div className="flex flex-col gap-4 pt-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {renderParamsInputs()}
+                    <TextInput label="Material" value={meta.material} onChange={v => setMeta(m => ({...m, material: v}))} />
+                    <TextInput label="Thk (mm)" value={meta.thickness} onChange={v => setMeta(m => ({...m, thickness: v}))} />
+                    
+                    {/* Coating Dropdown */}
+                    <div>
+                        <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Coating</label>
+                        <select
+                            value={meta.coating}
+                            onChange={(e) => setMeta(m => ({...m, coating: e.target.value}))}
+                            className="w-full p-1.5 border border-cad-300 rounded text-sm bg-white"
+                        >
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                            <option value="N/A">N/A</option>
+                        </select>
+                    </div>
+
+                    <TextInput label="Tag No" value={meta.tagNo} onChange={v => setMeta(m => ({...m, tagNo: v}))} />
+                    <NumInput label="Qty" value={meta.qty} onChange={v => setMeta(m => ({...m, qty: v}))} />
+                </div>
+
+                {/* Notes Input */}
+                <div>
+                <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Notes</label>
+                <input 
+                    type="text" 
+                    value={meta.notes}
+                    onChange={(e) => setMeta(m => ({...m, notes: e.target.value}))}
+                    className="w-full p-1.5 border border-cad-300 rounded text-sm"
+                    placeholder="Additional manufacturing notes..."
+                />
+                </div>
+                
+                <div className="flex justify-end pt-2 border-t border-cad-100 mt-2">
+                    <button 
+                        onClick={handleAdd}
+                        className="px-8 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold text-sm shadow-sm flex items-center gap-2 transition-all active:scale-95"
+                    >
+                        + Add Item to Order Sheet
+                    </button>
+                </div>
             </div>
         </div>
       </div>

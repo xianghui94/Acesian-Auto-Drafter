@@ -58,10 +58,10 @@
           size: A4 portrait;
           margin: 0;
         }
-        body {
-          background: white;
-          overflow: visible !important;
+        html, body {
           height: auto !important;
+          overflow: visible !important;
+          background: white;
         }
         .no-print {
           display: none !important;
@@ -69,6 +69,14 @@
         #root {
           height: auto !important;
           overflow: visible !important;
+          display: block !important;
+        }
+        
+        /* Reset layout containers */
+        #root > div, main, .overflow-auto, .overflow-hidden {
+            height: auto !important;
+            overflow: visible !important;
+            display: block !important;
         }
         
         /* Ensure pages break correctly */
@@ -78,7 +86,11 @@
           page-break-after: always;
           break-after: page;
         }
-        /* Last page doesn't need a break, but good practice to keep flow */
+        
+        .a4-page:last-child {
+            page-break-after: auto;
+            break-after: auto;
+        }
       }
     </style>
 <script type="importmap">

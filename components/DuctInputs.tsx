@@ -24,6 +24,30 @@ const NumInput = ({ label, value, onChange }: { label: string, value: number, on
     </div>
 );
 
+const TextInput = ({ label, value, onChange }: { label: string, value: string, onChange: (v: string) => void }) => (
+    <div>
+        <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">{label}</label>
+        <input 
+            type="text" 
+            value={value} 
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full p-1.5 border border-cad-300 rounded text-sm"
+        />
+    </div>
+);
+
+const TextAreaInput = ({ label, value, onChange }: { label: string, value: string, onChange: (v: string) => void }) => (
+    <div>
+        <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">{label}</label>
+        <textarea 
+            value={value} 
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full p-1.5 border border-cad-300 rounded text-sm font-sans"
+            rows={3}
+        />
+    </div>
+);
+
 export const ElbowInputs: React.FC<InputProps> = ({ params, onChange }) => (
     <>
         <NumInput label="D1 (mm)" value={params.d1} onChange={v => onChange('d1', v)} />
@@ -38,6 +62,12 @@ export const ElbowInputs: React.FC<InputProps> = ({ params, onChange }) => (
             </select>
         </div>
         <NumInput label="Radius R (mm)" value={params.radius} onChange={v => onChange('radius', v)} />
+        
+        {/* Flange Remarks */}
+        <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
+            <TextAreaInput label="Flange 1 Remark" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} />
+            <TextAreaInput label="Flange 2 Remark" value={params.flangeRemark2 || ""} onChange={v => onChange('flangeRemark2', v)} />
+        </div>
     </>
 );
 
@@ -168,7 +198,7 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
                         <div className="col-span-5">Remark</div>
                     </div>
                     {params.taps && params.taps.map((tap: any, idx: number) => (
-                        <div key={idx} className="grid grid-cols-12 gap-2 mb-2 items-center">
+                        <div key={idx} className="grid grid-cols-12 gap-2 mb-2 items-start">
                             <div className="col-span-1 text-xs font-mono font-bold text-center bg-cad-200 rounded py-1">{idx + 1}</div>
                             <input 
                                 type="number" 
@@ -191,12 +221,13 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
                                 className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full"
                                 placeholder="0"
                             />
-                            <input 
-                                type="text" 
+                            <textarea
                                 value={tap.remark || ""} 
                                 onChange={(e) => onTapUpdate!(idx, 'remark', e.target.value)}
-                                className="col-span-5 p-1 border border-cad-300 rounded text-xs w-full"
+                                className="col-span-5 p-1 border border-cad-300 rounded text-xs w-full resize-y font-sans leading-tight"
                                 placeholder="Optional..."
+                                rows={2}
+                                style={{ minHeight: '32px' }}
                             />
                         </div>
                     ))}
@@ -221,7 +252,7 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
                         <div className="col-span-5">Remark</div>
                     </div>
                     {params.nptPorts && params.nptPorts.map((port: any, idx: number) => (
-                        <div key={idx} className="grid grid-cols-12 gap-2 mb-2 items-center">
+                        <div key={idx} className="grid grid-cols-12 gap-2 mb-2 items-start">
                             <div className="col-span-1 text-xs font-mono font-bold text-center bg-cad-200 rounded py-1 text-purple-600">NPT{idx + 1}</div>
                             <input 
                                 type="number" 
@@ -247,12 +278,13 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
                                 className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full"
                                 placeholder="0"
                             />
-                            <input 
-                                type="text" 
+                            <textarea
                                 value={port.remark || ""} 
                                 onChange={(e) => onNptUpdate!(idx, 'remark', e.target.value)}
-                                className="col-span-5 p-1 border border-cad-300 rounded text-xs w-full"
+                                className="col-span-5 p-1 border border-cad-300 rounded text-xs w-full resize-y font-sans leading-tight"
                                 placeholder="Optional..."
+                                rows={2}
+                                style={{ minHeight: '32px' }}
                             />
                         </div>
                     ))}

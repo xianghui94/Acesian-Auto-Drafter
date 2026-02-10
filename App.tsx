@@ -48,19 +48,19 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-cad-50 font-sans text-cad-900 selection:bg-blue-100">
+    <div className="flex h-screen w-screen overflow-hidden bg-cad-50 font-sans text-cad-900 selection:bg-blue-100 print:h-auto print:w-auto print:overflow-visible print:block">
       
       {/* Left: Global Settings */}
       <Sidebar header={header} onChange={handleHeaderChange} />
       
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full relative overflow-hidden">
+      <main className="flex-1 flex flex-col h-full relative overflow-hidden print:h-auto print:overflow-visible print:block">
         
         {/* Top: Item Builder */}
         <ItemBuilder onAddItem={handleAddItem} />
 
         {/* Bottom: Preview */}
-        <div className="flex-1 relative overflow-auto bg-cad-200">
+        <div className="flex-1 relative overflow-auto bg-cad-200 print:h-auto print:overflow-visible print:bg-white print:block">
            {/* Print Toolbar */}
            <div className="no-print absolute top-4 right-8 z-30 flex gap-2">
               <button 
