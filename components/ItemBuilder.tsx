@@ -29,7 +29,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
       case ComponentType.ELBOW: setParams({ d1: 500, angle: 90 }); break;
       case ComponentType.REDUCER: setParams({ d1: 500, d2: 300, length: 500 }); break;
       case ComponentType.STRAIGHT: setParams({ d1: 300, length: 1000 }); break;
-      case ComponentType.TEE: setParams({ main_d: 500, tap_d: 300 }); break;
+      case ComponentType.TEE: setParams({ main_d: 500, tap_d: 300, length: 500, branch_l: 100 }); break;
       case ComponentType.TRANSFORMATION: setParams({ d1: 500, width: 500, height: 500, length: 300 }); break;
       case ComponentType.VOLUME_DAMPER: setParams({ d1: 200, length: 150, actuation: "Handle" }); break;
       case ComponentType.MULTIBLADE_DAMPER: setParams({ d1: 700, length: 400, bladeType: "Parallel" }); break;
@@ -81,10 +81,12 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
     if (componentType === ComponentType.MULTIBLADE_DAMPER && key === 'd1') {
         newParams.length = 400;
     }
-    
-    // Blast Gate Damper - Default Length 200 handled in useEffect, user can override if needed.
-    // Removed logic forcing length change on diameter change for Blast Gate.
 
+    // Tee Length Auto-calc (L = Bd + 200)
+    if (componentType === ComponentType.TEE && key === 'tap_d') {
+        newParams.length = Number(val) + 200;
+    }
+    
     setParams(newParams);
   };
 
@@ -166,6 +168,8 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
         description = `Blast Gate Damper Ø${params.d1}`;
     } else if (componentType === ComponentType.ANGLE_FLANGE) {
         description = `Angle Flange Ø${params.d1}`;
+    } else if (componentType === ComponentType.TEE) {
+        description = `Tee Ø${params.main_d} / Ø${params.tap_d}`;
     }
     
     onAddItem({

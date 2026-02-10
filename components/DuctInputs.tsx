@@ -59,6 +59,8 @@ export const TeeInputs: React.FC<InputProps> = ({ params, onChange }) => (
     <>
         <NumInput label="Main D (mm)" value={params.main_d} onChange={v => onChange('main_d', v)} />
         <NumInput label="Tap D (mm)" value={params.tap_d} onChange={v => onChange('tap_d', v)} />
+        <NumInput label="Body L (mm)" value={params.length} onChange={v => onChange('length', v)} />
+        <NumInput label="Branch L (mm)" value={params.branch_l} onChange={v => onChange('branch_l', v)} />
     </>
 );
 
@@ -128,8 +130,8 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
     onChange, 
     onTapQtyChange, 
     onNptQtyChange,
-    onTapUpdate,
-    onNptUpdate
+    onTapUpdate, 
+    onNptUpdate 
 }) => (
     <>
         <NumInput label="Main D (mm)" value={params.d1} onChange={v => onChange('d1', v)} />
