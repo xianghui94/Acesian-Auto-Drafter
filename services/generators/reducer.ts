@@ -1,19 +1,43 @@
 import { DuctParams } from "../../types";
 import { createSvg, drawDim, drawFlange, drawAnnotation, VIEW_BOX_SIZE, V_CONSTANTS } from "../svgUtils";
 
-const { LEN: V_LEN, DIAM_LG: V_DIAM_LG, DIAM_SM: V_DIAM_SM, REDUCER_STRAIGHT: V_REDUCER_STRAIGHT } = V_CONSTANTS;
+const { LEN: V_LEN, DIAM_LG: V_DIAM_LG, DIAM_SM: V_DIAM_SM } = V_CONSTANTS;
 
 export const generateReducer = (params: DuctParams) => {
   const cx = VIEW_BOX_SIZE / 2;
   const cy = VIEW_BOX_SIZE / 2;
-  const L = V_LEN;
-  const S = V_REDUCER_STRAIGHT;
+  
+  // Real dimensions
+  const realL = params.length || 500;
+  const realRC1 = params.extension1 !== undefined ? params.extension1 : 50; // Left (D1)
+  const realRC2 = params.extension2 !== undefined ? params.extension2 : 50; // Right (D2)
+  const realD1 = params.d1 || 500;
+  const realD2 = params.d2 || 300;
+
+  // Visual Geometry
+  const L = V_LEN; // Fixed visual total length
   const D1 = V_DIAM_LG;
   const D2 = V_DIAM_SM;
+  
+  // Calculate visual lengths of RC1 and RC2 based on proportion to Real L
+  // Note: If realL is very small, we might have issues, but assuming standard inputs.
+  const scale = L / realL;
+  let V_RC1 = realRC1 * scale;
+  let V_RC2 = realRC2 * scale;
+  
+  // Safety clamp to ensure tapered section exists visually
+  const minTaper = 40;
+  if (V_RC1 + V_RC2 > L - minTaper) {
+      // If extensions overlap, scale them down visually to fit
+      const factor = (L - minTaper) / (V_RC1 + V_RC2);
+      V_RC1 *= factor;
+      V_RC2 *= factor;
+  }
+  
   const xLeft = cx - L/2;
   const xRight = cx + L/2;
-  const xTransStart = xLeft + S;
-  const xTransEnd = xRight - S;
+  const xTransStart = xLeft + V_RC1;
+  const xTransEnd = xRight - V_RC2;
   const y1Top = cy - D1/2;
   const y1Bot = cy + D1/2;
   const y2Top = cy - D2/2;
@@ -45,9 +69,22 @@ export const generateReducer = (params: DuctParams) => {
       remark2 = drawAnnotation(xRight, y2Top, params.flangeRemark2, true, true, 80, false).svg;
   }
   
-  const dimL = drawDim(xLeft, y1Bot, xRight, y2Bot, `L=${params.length || 500}`, 'bottom');
-  const dimD1 = drawDim(xLeft, y1Top, xLeft, y1Bot, `D1=${params.d1 || 500}`, 'left'); 
-  const dimD2 = drawDim(xRight, y2Top, xRight, y2Bot, `D2=${params.d2 || 300}`, 'right');
+  // Dimensions
+  const dimL = drawDim(xLeft, y1Bot, xRight, y2Bot, `L=${realL}`, 'bottom', 60);
+  const dimD1 = drawDim(xLeft, y1Top, xLeft, y1Bot, `D1=${realD1}`, 'left'); 
+  const dimD2 = drawDim(xRight, y2Top, xRight, y2Bot, `D2=${realD2}`, 'right');
 
-  return createSvg(path + markers + dash + f1 + f2 + dimL + dimD1 + dimD2 + remark1 + remark2);
+  // RC1 and RC2 Dimensions (Top)
+  let dimRC1 = "";
+  let dimRC2 = "";
+  
+  // Only draw if length is significant enough AND not equal to default (50)
+  if (V_RC1 > 10 && realRC1 !== 50) {
+      dimRC1 = drawDim(xLeft, y1Top, xTransStart, y1Top, `RC1=${realRC1}`, 'top', 30);
+  }
+  if (V_RC2 > 10 && realRC2 !== 50) {
+      dimRC2 = drawDim(xTransEnd, y2Top, xRight, y2Top, `RC2=${realRC2}`, 'top', 30);
+  }
+
+  return createSvg(path + markers + dash + f1 + f2 + dimL + dimD1 + dimD2 + dimRC1 + dimRC2 + remark1 + remark2);
 };

@@ -30,10 +30,10 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
       case ComponentType.ELBOW: 
         // Initial defaults for Elbow
         // Default D=500. For D>=200, we use Throat R = 0.5D -> 250
-        setParams({ d1: 500, angle: 90, radius: 250, flangeRemark1: "", flangeRemark2: "" }); 
+        setParams({ d1: 500, angle: 90, radius: 250, extension1: 0, extension2: 0, flangeRemark1: "", flangeRemark2: "" }); 
         break;
       case ComponentType.REDUCER: 
-        setParams({ d1: 500, d2: 300, length: 500, flangeRemark1: "", flangeRemark2: "" }); 
+        setParams({ d1: 500, d2: 300, length: 500, extension1: 50, extension2: 50, flangeRemark1: "", flangeRemark2: "" }); 
         break;
       case ComponentType.STRAIGHT: 
         setParams({ d1: 300, length: 1000, flangeRemark1: "", flangeRemark2: "" }); 
@@ -217,8 +217,14 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
         description = `Offset Ø${params.d1} / L=${params.length} / H=${params.offset}`;
     } else if (componentType === ComponentType.ELBOW) {
         description = `Elbow Ø${params.d1} / ${params.angle}° / R${params.radius}`;
+        if (params.extension1 > 0 || params.extension2 > 0) {
+            description += ` / Ext:${params.extension1 || 0}+${params.extension2 || 0}`;
+        }
     } else if (componentType === ComponentType.REDUCER) {
         description = `Reducer Ø${params.d1} / Ø${params.d2} / L${params.length}`;
+        if (params.extension1 !== 50 || params.extension2 !== 50) {
+             description += ` / RC:${params.extension1}-${params.extension2}`;
+        }
     }
     
     onAddItem({

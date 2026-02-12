@@ -63,6 +63,12 @@ export const ElbowInputs: React.FC<InputProps> = ({ params, onChange }) => (
         </div>
         <NumInput label="Radius R (mm)" value={params.radius} onChange={v => onChange('radius', v)} />
         
+        {/* Extensions */}
+        <div className="grid grid-cols-2 gap-2">
+            <NumInput label="Ext 1 (mm)" value={params.extension1 || 0} onChange={v => onChange('extension1', v)} />
+            <NumInput label="Ext 2 (mm)" value={params.extension2 || 0} onChange={v => onChange('extension2', v)} />
+        </div>
+        
         {/* Flange Remarks */}
         <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
             <TextAreaInput label="Flange 1 Remark" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} />
@@ -77,6 +83,11 @@ export const ReducerInputs: React.FC<InputProps> = ({ params, onChange }) => (
         <NumInput label="D2 (mm)" value={params.d2} onChange={v => onChange('d2', v)} />
         <NumInput label="Total L (mm)" value={params.length} onChange={v => onChange('length', v)} />
         
+        <div className="grid grid-cols-2 gap-2">
+            <NumInput label="RC1 (mm)" value={params.extension1 || 50} onChange={v => onChange('extension1', v)} />
+            <NumInput label="RC2 (mm)" value={params.extension2 || 50} onChange={v => onChange('extension2', v)} />
+        </div>
+
         {/* Flange Remarks */}
         <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
             <TextAreaInput label="Flange 1 Remark (Left)" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} />
