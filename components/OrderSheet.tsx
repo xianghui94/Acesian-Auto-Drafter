@@ -65,7 +65,8 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
   // Total Fixed: 30 + 42 + 10 = 82mm
   // Remaining for 3 rows of items: 277 - 82 = 195mm
   // Height per item row: 195 / 3 = 65mm
-  const ITEM_HEIGHT = "65mm";
+  // Adjusted to 64.5mm to accommodate border widths and avoid overflow
+  const ITEM_HEIGHT = "64.5mm";
 
   return (
     <div className="a4-page text-black font-sans text-sm flex flex-col">

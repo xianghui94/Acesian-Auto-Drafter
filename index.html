@@ -58,25 +58,13 @@
           size: A4 portrait;
           margin: 0;
         }
-        html, body {
-          height: auto !important;
-          overflow: visible !important;
-          background: white;
-        }
-        .no-print {
-          display: none !important;
-        }
-        #root {
+        html, body, #root {
           height: auto !important;
           overflow: visible !important;
           display: block !important;
         }
-        
-        /* Reset layout containers */
-        #root > div, main, .overflow-auto, .overflow-hidden {
-            height: auto !important;
-            overflow: visible !important;
-            display: block !important;
+        .no-print {
+          display: none !important;
         }
         
         /* Ensure pages break correctly */
