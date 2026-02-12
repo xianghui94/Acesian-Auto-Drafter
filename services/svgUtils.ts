@@ -1,4 +1,5 @@
 
+
 /**
  * Shared Utilities for SVG Generation
  */
@@ -138,7 +139,8 @@ export const drawAnnotation = (
   isTop: boolean = true, 
   isRight: boolean = true,
   leaderLength: number = 50,
-  textBelow: boolean = false
+  textBelow: boolean = false,
+  customFontSize: number | null = null
 ) => {
     // Top annotation goes Up, Bot annotation goes Down
     // Use custom leaderLength if provided
@@ -147,8 +149,8 @@ export const drawAnnotation = (
     const x2 = x + dx;
     const y2 = y + dy;
     
-    // Updated to match Dimension Text Size (CFG.textSize = 24)
-    const fontSize = CFG.textSize; 
+    // Updated to match Dimension Text Size (CFG.textSize = 24) or use custom if provided
+    const fontSize = customFontSize !== null ? customFontSize : CFG.textSize; 
     const lineHeight = fontSize * 1.2; 
     const charWidth = fontSize * 0.55; 
 
