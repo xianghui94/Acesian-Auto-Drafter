@@ -1,5 +1,5 @@
 import { DuctParams } from "../../types";
-import { createSvg, drawDim, drawFlange, VIEW_BOX_SIZE } from "../svgUtils";
+import { createSvg, drawDim, drawFlange, drawAnnotation, VIEW_BOX_SIZE } from "../svgUtils";
 
 export const generateOffset = (params: DuctParams) => {
     const cx = VIEW_BOX_SIZE / 2;
@@ -66,6 +66,19 @@ export const generateOffset = (params: DuctParams) => {
     const f1 = drawFlange(xL_Start, cy1, V_DIAM, true);
     const f2 = drawFlange(xR_End, cy2, V_DIAM, true);
     
+    // Remarks
+    let remark1 = "";
+    if (params.flangeRemark1) {
+        // Point to top of left flange
+        remark1 = drawAnnotation(xL_Start, yL_Top, params.flangeRemark1, true, false, 80, false).svg;
+    }
+    
+    let remark2 = "";
+    if (params.flangeRemark2) {
+        // Point to top of right flange
+        remark2 = drawAnnotation(xR_End, yR_Top, params.flangeRemark2, true, true, 80, false).svg;
+    }
+    
     // --- Dimensions ---
     
     // 1. Length L (Top)
@@ -90,6 +103,6 @@ export const generateOffset = (params: DuctParams) => {
 
     return createSvg(
         `<path d="${bodyPath}" class="line" />` + 
-        creases + cLineSvg + f1 + f2 + axisLower + axisUpper + dimL + dimD + dimH
+        creases + cLineSvg + f1 + f2 + axisLower + axisUpper + dimL + dimD + dimH + remark1 + remark2
     );
 };

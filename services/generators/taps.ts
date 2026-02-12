@@ -319,7 +319,7 @@ const drawDimensionStack = (
             ? startY - (maxTier * LEVEL_HEIGHT)
             : startY + (maxTier * LEVEL_HEIGHT);
             
-        return { svg: stackSvg, finalY };
+        return { svg, finalY };
     };
 
     const topResult = renderStack(topDims, 'top');
@@ -408,6 +408,19 @@ export const generateStraightWithTaps = (params: DuctParams) => {
     
     // Increased dot size by 50% (r=4 -> r=6)
     svgContent += `<circle cx="${sx}" cy="${sy}" r="6" fill="black" />`;
+
+    // Flange Remarks
+    // Placement strategy to minimize collision with taps and dimension stacks
+    // F1 (Left): Point to Top-Left, Go Up & Left. Avoids dimension stack which is centered/right-biased usually.
+    // F2 (Right): Point to Top-Right, Go Up & Right.
+    if (params.flangeRemark1) {
+        // xL, yT is Top-Left corner of pipe body
+        svgContent += drawAnnotation(xL, yT, params.flangeRemark1, true, false, 80, false).svg;
+    }
+    if (params.flangeRemark2) {
+        // xR, yT is Top-Right corner of pipe body
+        svgContent += drawAnnotation(xR, yT, params.flangeRemark2, true, true, 80, false).svg;
+    }
 
     svgContent += drawDimensionStack(
         features, 

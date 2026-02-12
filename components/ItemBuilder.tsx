@@ -32,10 +32,24 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
         // Default D=500. For D>=200, we use Throat R = 0.5D -> 250
         setParams({ d1: 500, angle: 90, radius: 250, flangeRemark1: "", flangeRemark2: "" }); 
         break;
-      case ComponentType.REDUCER: setParams({ d1: 500, d2: 300, length: 500 }); break;
-      case ComponentType.STRAIGHT: setParams({ d1: 300, length: 1000 }); break;
-      case ComponentType.TEE: setParams({ main_d: 500, tap_d: 300, length: 500, branch_l: 100 }); break;
-      case ComponentType.TRANSFORMATION: setParams({ d1: 500, width: 500, height: 500, length: 300 }); break;
+      case ComponentType.REDUCER: 
+        setParams({ d1: 500, d2: 300, length: 500, flangeRemark1: "", flangeRemark2: "" }); 
+        break;
+      case ComponentType.STRAIGHT: 
+        setParams({ d1: 300, length: 1000, flangeRemark1: "", flangeRemark2: "" }); 
+        break;
+      case ComponentType.TEE: 
+        setParams({ 
+            main_d: 500, 
+            tap_d: 300, 
+            length: 500, 
+            branch_l: 100, 
+            flangeRemark1: "", // Left
+            flangeRemark2: "", // Right
+            flangeRemark3: ""  // Branch
+        }); 
+        break;
+      case ComponentType.TRANSFORMATION: setParams({ d1: 500, width: 500, height: 500, length: 300, flangeRemark1: "", flangeRemark2: "" }); break;
       case ComponentType.VOLUME_DAMPER: setParams({ d1: 200, length: 150, actuation: "Handle" }); break;
       case ComponentType.MULTIBLADE_DAMPER: setParams({ d1: 700, length: 400, bladeType: "Parallel" }); break;
       case ComponentType.STRAIGHT_WITH_TAPS: 
@@ -45,6 +59,8 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
             tapQty: 1,
             nptQty: 0,
             seamAngle: 0,
+            flangeRemark1: "", 
+            flangeRemark2: "",
             taps: [{ dist: 600, diameter: 150, angle: 0, remark: "" }],
             nptPorts: []
         }); 
@@ -52,7 +68,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
       case ComponentType.BLIND_PLATE: setParams({ d1: 200 }); break;
       case ComponentType.BLAST_GATE_DAMPER: setParams({ d1: 200, length: 200 }); break;
       case ComponentType.ANGLE_FLANGE: setParams({ d1: 800 }); break;
-      case ComponentType.OFFSET: setParams({ d1: 500, length: 800, offset: 200 }); break;
+      case ComponentType.OFFSET: setParams({ d1: 500, length: 800, offset: 200, flangeRemark1: "", flangeRemark2: "" }); break;
     }
 
     // Default Meta handling for specific types
@@ -201,6 +217,8 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
         description = `Offset Ø${params.d1} / L=${params.length} / H=${params.offset}`;
     } else if (componentType === ComponentType.ELBOW) {
         description = `Elbow Ø${params.d1} / ${params.angle}° / R${params.radius}`;
+    } else if (componentType === ComponentType.REDUCER) {
+        description = `Reducer Ø${params.d1} / Ø${params.d2} / L${params.length}`;
     }
     
     onAddItem({

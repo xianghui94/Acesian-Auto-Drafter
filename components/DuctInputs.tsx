@@ -76,6 +76,12 @@ export const ReducerInputs: React.FC<InputProps> = ({ params, onChange }) => (
         <NumInput label="D1 (mm)" value={params.d1} onChange={v => onChange('d1', v)} />
         <NumInput label="D2 (mm)" value={params.d2} onChange={v => onChange('d2', v)} />
         <NumInput label="Total L (mm)" value={params.length} onChange={v => onChange('length', v)} />
+        
+        {/* Flange Remarks */}
+        <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
+            <TextAreaInput label="Flange 1 Remark (Left)" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} />
+            <TextAreaInput label="Flange 2 Remark (Right)" value={params.flangeRemark2 || ""} onChange={v => onChange('flangeRemark2', v)} />
+        </div>
     </>
 );
 
@@ -83,6 +89,12 @@ export const StraightInputs: React.FC<InputProps> = ({ params, onChange }) => (
     <>
         <NumInput label="D1 (mm)" value={params.d1} onChange={v => onChange('d1', v)} />
         <NumInput label="Len (mm)" value={params.length} onChange={v => onChange('length', v)} />
+
+        {/* Flange Remarks */}
+        <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
+            <TextAreaInput label="Flange 1 Remark (Left)" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} />
+            <TextAreaInput label="Flange 2 Remark (Right)" value={params.flangeRemark2 || ""} onChange={v => onChange('flangeRemark2', v)} />
+        </div>
     </>
 );
 
@@ -92,6 +104,13 @@ export const TeeInputs: React.FC<InputProps> = ({ params, onChange }) => (
         <NumInput label="Tap D (mm)" value={params.tap_d} onChange={v => onChange('tap_d', v)} />
         <NumInput label="Body L (mm)" value={params.length} onChange={v => onChange('length', v)} />
         <NumInput label="Branch L (mm)" value={params.branch_l} onChange={v => onChange('branch_l', v)} />
+        
+        {/* Flange Remarks */}
+        <div className="col-span-2 md:col-span-4 lg:col-span-6 grid grid-cols-3 gap-4 border-t border-cad-200 pt-2 mt-2">
+             <TextAreaInput label="F1 Remark (Left)" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} />
+             <TextAreaInput label="F2 Remark (Right)" value={params.flangeRemark2 || ""} onChange={v => onChange('flangeRemark2', v)} />
+             <TextAreaInput label="F3 Remark (Branch)" value={params.flangeRemark3 || ""} onChange={v => onChange('flangeRemark3', v)} />
+        </div>
     </>
 );
 
@@ -101,6 +120,12 @@ export const TransformationInputs: React.FC<InputProps> = ({ params, onChange })
         <NumInput label="Rect L (mm)" value={params.width} onChange={v => onChange('width', v)} />
         <NumInput label="Rect W (mm)" value={params.height} onChange={v => onChange('height', v)} />
         <NumInput label="Length L (mm)" value={params.length} onChange={v => onChange('length', v)} />
+
+        {/* Flange Remarks */}
+        <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
+            <TextAreaInput label="Round Flange Remark" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} />
+            <TextAreaInput label="Rect Flange Remark" value={params.flangeRemark2 || ""} onChange={v => onChange('flangeRemark2', v)} />
+        </div>
     </>
 );
 
@@ -182,6 +207,12 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
         >
             {[0, 45, 90, 135, 180, 225, 270, 315].map(deg => <option key={deg} value={deg}>{deg}</option>)}
         </select>
+        </div>
+        
+        {/* Flange Remarks */}
+        <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
+            <TextAreaInput label="Flange 1 Remark (Left)" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} />
+            <TextAreaInput label="Flange 2 Remark (Right)" value={params.flangeRemark2 || ""} onChange={v => onChange('flangeRemark2', v)} />
         </div>
 
         {/* Taps Config */}
@@ -321,5 +352,11 @@ export const OffsetInputs: React.FC<InputProps> = ({ params, onChange }) => (
         <NumInput label="Diameter Ø (mm)" value={params.d1} onChange={v => onChange('d1', v)} />
         <NumInput label="Length L (mm)" value={params.length} onChange={v => onChange('length', v)} />
         <NumInput label="Offset H (mm)" value={params.offset} onChange={v => onChange('offset', v)} />
+        
+        {/* Flange Remarks */}
+        <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
+            <TextAreaInput label="Flange 1 Remark (Left)" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} />
+            <TextAreaInput label="Flange 2 Remark (Right)" value={params.flangeRemark2 || ""} onChange={v => onChange('flangeRemark2', v)} />
+        </div>
     </>
 );
