@@ -1,9 +1,9 @@
 import { DuctParams } from "../../types";
 import { createSvg, drawDim, drawFlange, drawAnnotation } from "../svgUtils";
 
-export const generateTee = (params: DuctParams) => {
+export const generateTee = (params: DuctParams, activeField: string | null = null) => {
   const VIEW_WIDTH = 800;
-  const VIEW_HEIGHT = 500;
+  const VIEW_HEIGHT = 450; // Reduced from 500
   const cy = VIEW_HEIGHT / 2;
   const cxLeft = VIEW_WIDTH * 0.3;
   const cxRight = VIEW_WIDTH * 0.75;
@@ -87,8 +87,8 @@ export const generateTee = (params: DuctParams) => {
   `;
 
   // Dimensions Top View
-  const dimL = drawDim(xL_Left, yB_Left, xR_Left, yB_Left, `L=${L}`, 'bottom', 65); // Moved down slightly to avoid remark overlapping if any
-  const dimMd = drawDim(xL_Left - 15, yT_Left, xL_Left - 15, yB_Left, `Ø${Md}`, 'left');
+  const dimL = drawDim(xL_Left, yB_Left, xR_Left, yB_Left, `L=${L}`, 'bottom', 65, 'length', activeField); // Moved down slightly to avoid remark overlapping if any
+  const dimMd = drawDim(xL_Left - 15, yT_Left, xL_Left - 15, yB_Left, `Ø${Md}`, 'left', null, 'main_d', activeField);
   
   // --- SIDE VIEW (Right) ---
   // Rotated 90 deg anticlockwise from Branch Up
@@ -124,12 +124,12 @@ export const generateTee = (params: DuctParams) => {
   `;
 
   // Dimensions Side View
-  const dimBd = drawDim(xBranchTip, yBranchTop_R, xBranchTip, yBranchBot_R, `Ø${Bd}`, 'left');
+  const dimBd = drawDim(xBranchTip, yBranchTop_R, xBranchTip, yBranchBot_R, `Ø${Bd}`, 'left', null, 'tap_d', activeField);
   
   // Branch Length Dimension (Side View)
   // From tip to the main duct edge (vertical tangent at center-line level)
   const xMainEdge = cxRight - V_MD/2;
-  const dimBranchLen = drawDim(xBranchTip, yBranchTop_R, xMainEdge, yBranchTop_R, `${neckLen}`, 'top', 30);
+  const dimBranchLen = drawDim(xBranchTip, yBranchTop_R, xMainEdge, yBranchTop_R, `${neckLen}`, 'top', 30, 'branch_l', activeField);
   
   // Center Lines Side View
   const clRight = `

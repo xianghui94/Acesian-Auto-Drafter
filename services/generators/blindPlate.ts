@@ -10,9 +10,11 @@ const BLIND_PLATE_LOOKUP: Record<number, number> = {
     2000: 2102
 };
 
-export const generateBlindPlate = (params: DuctParams) => {
-    const cx = VIEW_BOX_SIZE / 2;
-    const cy = VIEW_BOX_SIZE / 2;
+export const generateBlindPlate = (params: DuctParams, activeField: string | null = null) => {
+    const VIEW_WIDTH = VIEW_BOX_SIZE;
+    const VIEW_HEIGHT = 600; // Reduced from 800
+    const cx = VIEW_WIDTH / 2;
+    const cy = VIEW_HEIGHT / 2;
     
     const dNominal = params.d1 || 200;
     
@@ -68,8 +70,6 @@ export const generateBlindPlate = (params: DuctParams) => {
             labelText = "2 x 2 Angle Bar 40mm x 40mm x 4mm";
         } else {
             labelText = "2 x 2 Angle Bar 50mm x 50mm x 5mm"; 
-            // Note: "Angle Flange 1PC" omitted or can be added if crucial, 
-            // keeping it cleaner for drawing labels.
         }
         showLabel = true;
     }
@@ -98,7 +98,7 @@ export const generateBlindPlate = (params: DuctParams) => {
     }
 
     // Top Dimension
-    const dimTop = drawDim(cx - V_R_ID, cy, cx + V_R_ID, cy, `Ø${dNominal}`, 'top', V_R + 30);
+    const dimTop = drawDim(cx - V_R_ID, cy, cx + V_R_ID, cy, `Ø${dNominal}`, 'top', V_R + 30, 'd1', activeField);
 
-    return createSvg(circle + idCircle + pcd + centerLong + bars + barLabel + holes + dimTop);
+    return createSvg(circle + idCircle + pcd + centerLong + bars + barLabel + holes + dimTop, VIEW_WIDTH, VIEW_HEIGHT);
 };

@@ -3,9 +3,11 @@ import { createSvg, drawDim, drawFlange, drawAnnotation, VIEW_BOX_SIZE, V_CONSTA
 
 const { LEN: V_LEN, DIAM: V_DIAM } = V_CONSTANTS;
 
-export const generateStraight = (params: DuctParams) => {
-  const cx = VIEW_BOX_SIZE / 2;
-  const cy = VIEW_BOX_SIZE / 2;
+export const generateStraight = (params: DuctParams, activeField: string | null = null) => {
+  const VIEW_WIDTH = VIEW_BOX_SIZE;
+  const VIEW_HEIGHT = 350; // Reduced from 800
+  const cx = VIEW_WIDTH / 2;
+  const cy = VIEW_HEIGHT / 2;
   const L = V_LEN;
   const D = V_DIAM;
   const x1 = cx - L/2;
@@ -30,8 +32,8 @@ export const generateStraight = (params: DuctParams) => {
       remark2 = drawAnnotation(x2, yTop, params.flangeRemark2, true, true, 80, false).svg;
   }
   
-  const dimL = drawDim(x1, yBot, x2, yBot, `L=${params.length || 1000}`, 'bottom');
-  const dimD = drawDim(x2, yTop, x2, yBot, `D=${params.d1 || 300}`, 'right');
+  const dimL = drawDim(x1, yBot, x2, yBot, `L=${params.length || 1000}`, 'bottom', null, 'length', activeField);
+  const dimD = drawDim(x2, yTop, x2, yBot, `D=${params.d1 || 300}`, 'right', null, 'd1', activeField);
 
-  return createSvg(path + f1 + f2 + dimL + dimD + remark1 + remark2);
+  return createSvg(path + f1 + f2 + dimL + dimD + remark1 + remark2, VIEW_WIDTH, VIEW_HEIGHT);
 };

@@ -7,59 +7,87 @@ interface OrderSheetProps {
   onRemoveItem: (id: string) => void;
   onEditItem: (item: OrderItem) => void;
   onInsertBefore: (index: number) => void;
+  onDuplicateItem: (item: OrderItem) => void;
+  onMoveItem: (index: number, direction: 'up' | 'down') => void;
 }
 
 const ITEMS_PER_PAGE = 6;
 
-export const OrderSheet: React.FC<OrderSheetProps> = ({ header, items, onRemoveItem, onEditItem, onInsertBefore }) => {
+export const OrderSheet: React.FC<OrderSheetProps> = ({ header, items, onRemoveItem, onEditItem, onInsertBefore, onDuplicateItem, onMoveItem }) => {
   
+  if (items.length === 0) {
+      return (
+          <div className="flex flex-col items-center justify-center p-12 bg-white rounded-lg shadow-sm border border-cad-200 text-center max-w-2xl mx-auto mt-8">
+              <div className="text-6xl mb-4">Drafting Board</div>
+              <h2 className="text-2xl font-bold text-cad-800 mb-2">No Items Yet</h2>
+              <p className="text-cad-500 mb-6">Select a component type from the builder above and click "Add Item" to start your order sheet.</p>
+              <div className="p-4 bg-cad-50 rounded text-sm text-cad-600 border border-cad-100 text-left space-y-2">
+                  <p><strong>⚡ Shortcut:</strong> Use <span className="font-mono bg-white px-1 border rounded">Ctrl+Enter</span> to quick add.</p>
+                  <p><strong>👀 Preview:</strong> Click inputs to see dimensions highlight in the sketch.</p>
+              </div>
+          </div>
+      );
+  }
+
   // Split items into pages
   const pages = [];
-  if (items.length === 0) {
-    pages.push([]); // At least one page
-  } else {
-    for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
-      pages.push(items.slice(i, i + ITEMS_PER_PAGE));
-    }
+  for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
+    pages.push(items.slice(i, i + ITEMS_PER_PAGE));
   }
 
   return (
-    <div className="flex flex-col gap-8 bg-cad-200 p-8 items-center print:p-0 print:gap-0 print:bg-white print:block">
-      {pages.map((pageItems, pageIndex) => (
-        <SinglePage 
-          key={pageIndex}
-          header={header}
-          items={pageItems}
-          pageIndex={pageIndex}
-          totalPages={pages.length}
-          startIndex={pageIndex * ITEMS_PER_PAGE}
-          onRemoveItem={onRemoveItem}
-          onEditItem={onEditItem}
-          onInsertBefore={onInsertBefore}
-        />
-      ))}
+    <div className="flex relative">
+        <div className="flex flex-col gap-8 bg-cad-200 p-8 items-center print:p-0 print:gap-0 print:bg-white print:block w-full">
+        {pages.map((pageItems, pageIndex) => (
+            <div key={pageIndex} id={`page-${pageIndex + 1}`}>
+                <SinglePage 
+                    header={header}
+                    items={pageItems}
+                    pageIndex={pageIndex}
+                    totalPages={pages.length}
+                    startIndex={pageIndex * ITEMS_PER_PAGE}
+                    onRemoveItem={onRemoveItem}
+                    onEditItem={onEditItem}
+                    onInsertBefore={onInsertBefore}
+                    onDuplicateItem={onDuplicateItem}
+                    onMoveItem={onMoveItem}
+                />
+            </div>
+        ))}
+        </div>
+
+        {/* Mini Map (Table of Contents) - Only visible on large screens */}
+        <div className="hidden xl:block fixed right-4 top-24 bottom-4 w-32 no-print overflow-y-auto pr-2 pointer-events-none">
+            <div className="pointer-events-auto bg-white/80 backdrop-blur rounded-lg shadow border border-cad-200 p-2 flex flex-col gap-2">
+                <span className="text-[10px] font-bold uppercase text-cad-400 text-center">Page Index</span>
+                {pages.map((_, idx) => (
+                    <a 
+                        key={idx} 
+                        href={`#page-${idx + 1}`}
+                        className="block text-center text-xs py-1 px-2 rounded hover:bg-blue-50 text-cad-600 hover:text-blue-600 font-medium transition-colors"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            document.getElementById(`page-${idx + 1}`)?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                    >
+                        Page {idx + 1}
+                    </a>
+                ))}
+            </div>
+        </div>
     </div>
   );
 };
 
 // --- Subcomponents ---
 
-const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemoveItem, onEditItem, onInsertBefore }: any) => {
+const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemoveItem, onEditItem, onInsertBefore, onDuplicateItem, onMoveItem }: any) => {
   // Fill empty slots to always show grid lines for 6 items
   const paddedItems = [...items];
   while (paddedItems.length < ITEMS_PER_PAGE) {
     paddedItems.push(null);
   }
 
-  // Layout Calculation:
-  // Total Content Height (A4 minus margins): ~277mm
-  // Header: 30mm (Increased for logos)
-  // Info Table: 30mm (5 rows x 6mm) + 12mm (Last Row) = 42mm
-  // Footer: 10mm
-  // Total Fixed: 30 + 42 + 10 = 82mm
-  // Remaining for 3 rows of items: 277 - 82 = 195mm
-  // Height per item row: 195 / 3 = 65mm
-  // Adjusted to 64.5mm to accommodate border widths and avoid overflow
   const ITEM_HEIGHT = "64.5mm";
 
   return (
@@ -146,7 +174,9 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
 
           {/* Items Grid - Expanded Height */}
           <div className="flex-1 flex flex-wrap content-start">
-             {paddedItems.map((item: OrderItem | null, idx: number) => (
+             {paddedItems.map((item: OrderItem | null, idx: number) => {
+                 const absoluteIndex = startIndex + idx;
+                 return (
                  <div 
                     key={item ? item.id : `empty-${idx}`} 
                     className="w-1/2 border-b border-r border-black relative box-border even:border-r-0 flex flex-col overflow-hidden group"
@@ -157,7 +187,7 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
                            {/* Row 1: Attributes - Box Style - Rebalanced Widths */}
                            <div className="flex border-b border-black text-[10px] leading-tight h-[5mm]">
                                <div className="w-[18%] border-r border-black pl-1 flex items-center bg-gray-50">
-                                 <span className="font-bold mr-1">Item:</span>{startIndex + idx + 1}
+                                 <span className="font-bold mr-1">Item:</span>{absoluteIndex + 1}
                                </div>
                                <div className="w-[12%] border-r border-black pl-1 flex items-center">
                                  <span className="font-bold mr-1">Qty:</span>{item.qty}
@@ -200,12 +230,31 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
                            
                            {/* Action Buttons (No Print) */}
                            <div className="no-print absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 p-1 rounded border border-gray-200 shadow-sm z-20">
+                             <div className="flex flex-col gap-0.5 border-r border-gray-200 pr-1 mr-1">
+                                 <button 
+                                   onClick={() => onMoveItem(absoluteIndex, 'up')}
+                                   className="text-gray-600 hover:text-blue-600 text-[10px] px-1 hover:bg-gray-100 rounded"
+                                   title="Move Up"
+                                 >▲</button>
+                                 <button 
+                                   onClick={() => onMoveItem(absoluteIndex, 'down')}
+                                   className="text-gray-600 hover:text-blue-600 text-[10px] px-1 hover:bg-gray-100 rounded"
+                                   title="Move Down"
+                                 >▼</button>
+                             </div>
                              <button 
-                               onClick={() => onInsertBefore(startIndex + idx)}
+                               onClick={() => onInsertBefore(absoluteIndex)}
                                className="text-green-600 hover:text-green-800 text-[10px] font-bold px-1.5 py-0.5 bg-green-50 rounded border border-green-200"
                                title="Insert new item before this one"
                              >
                                + Insert
+                             </button>
+                             <button 
+                               onClick={() => onDuplicateItem(item)}
+                               className="text-purple-600 hover:text-purple-800 text-[10px] font-bold px-1.5 py-0.5 bg-purple-50 rounded border border-purple-200"
+                               title="Duplicate Item"
+                             >
+                               ❐ Copy
                              </button>
                              <button 
                                onClick={() => onEditItem(item)}
@@ -227,7 +276,8 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
                         <div className="w-full h-full"></div>
                      )}
                  </div>
-             ))}
+                 );
+             })}
           </div>
 
           {/* Footer - Fixed Height 10mm */}

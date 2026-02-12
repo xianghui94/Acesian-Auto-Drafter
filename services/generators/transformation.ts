@@ -3,9 +3,12 @@ import { createSvg, drawDim, drawFlange, drawAnnotation, VIEW_BOX_SIZE, V_CONSTA
 
 const { TRANS_LEN: V_TRANS_LEN, TRANS_TAN: V_TRANS_TAN } = V_CONSTANTS;
 
-export const generateTransformation = (params: DuctParams) => {
-    const cx = VIEW_BOX_SIZE / 2;
-    const cy = VIEW_BOX_SIZE / 2;
+export const generateTransformation = (params: DuctParams, activeField: string | null = null) => {
+    const VIEW_WIDTH = VIEW_BOX_SIZE;
+    const VIEW_HEIGHT = 500; // Reduced from 800
+    const cx = VIEW_WIDTH / 2;
+    const cy = VIEW_HEIGHT / 2;
+    
     const realD = params.d1 || 500;
     const realS = params.height || 500; 
     const BASE_MAX = 200; 
@@ -41,9 +44,14 @@ export const generateTransformation = (params: DuctParams) => {
     const path = `<path d="${contour}" class="line" />`;
     const f1 = drawFlange(xLeft, cy, D, true);
     const f2 = drawFlange(xRight, cy, S, true);
-    const dimD = drawDim(xLeft, yRoundTop, xLeft, yRoundBot, `Ø${params.d1 || 500}`, 'left');
-    const dimS = drawDim(xRight, yRectTop, xRight, yRectBot, `${params.width || 500}x${params.height || 500}`, 'right');
-    const dimL = drawDim(xLeft, yRectBot, xRight, yRectBot, `L=${params.length || 300}`, 'bottom');
+
+    const dimD = drawDim(xLeft, yRoundTop, xLeft, yRoundBot, `Ø${params.d1 || 500}`, 'left', null, 'd1', activeField);
+    
+    // For Width x Height, we highlight if either is focused.
+    const rectDimId = (activeField === 'width' || activeField === 'height') ? activeField : 'rect';
+    const dimS = drawDim(xRight, yRectTop, xRight, yRectBot, `${params.width || 500}x${params.height || 500}`, 'right', null, rectDimId, activeField);
+    
+    const dimL = drawDim(xLeft, yRectBot, xRight, yRectBot, `L=${params.length || 300}`, 'bottom', null, 'length', activeField);
     
     // Remarks
     let remark1 = "";
@@ -58,5 +66,5 @@ export const generateTransformation = (params: DuctParams) => {
         remark2 = drawAnnotation(xRight, yRectTop, params.flangeRemark2, true, true, 80, false).svg;
     }
 
-    return createSvg(path + center + crease + f1 + f2 + dimD + dimS + dimL + remark1 + remark2);
+    return createSvg(path + center + crease + f1 + f2 + dimD + dimS + dimL + remark1 + remark2, VIEW_WIDTH, VIEW_HEIGHT);
 };

@@ -1,9 +1,11 @@
 import { DuctParams } from "../../types";
 import { createSvg, drawDim, VIEW_BOX_SIZE } from "../svgUtils";
 
-export const generateAngleFlange = (params: DuctParams) => {
-    const cx = VIEW_BOX_SIZE / 2;
-    const cy = VIEW_BOX_SIZE / 2 + 20; // Shift down slightly
+export const generateAngleFlange = (params: DuctParams, activeField: string | null = null) => {
+    const VIEW_WIDTH = VIEW_BOX_SIZE;
+    const VIEW_HEIGHT = 500; // Reduced from 800
+    const cx = VIEW_WIDTH / 2;
+    const cy = VIEW_HEIGHT / 2;
     
     const d1 = params.d1 || 800;
     
@@ -39,7 +41,7 @@ export const generateAngleFlange = (params: DuctParams) => {
     // Dimension takes from inner circle (ID) and moves further up to avoid overlap with OD.
     // V_OD radius is 150. Offset needs to be > 150.
     const dimOffset = 180;
-    const dim = drawDim(cx - V_ID/2, cy, cx + V_ID/2, cy, `Ø${d1}`, 'top', dimOffset);
+    const dim = drawDim(cx - V_ID/2, cy, cx + V_ID/2, cy, `Ø${d1}`, 'top', dimOffset, 'd1', activeField);
 
-    return createSvg(odCircle + idCircle + pcdCircle + centerLines + holes + dim);
+    return createSvg(odCircle + idCircle + pcdCircle + centerLines + holes + dim, VIEW_WIDTH, VIEW_HEIGHT);
 };

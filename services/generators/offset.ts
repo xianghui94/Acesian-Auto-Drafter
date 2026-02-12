@@ -1,9 +1,11 @@
 import { DuctParams } from "../../types";
 import { createSvg, drawDim, drawFlange, drawAnnotation, VIEW_BOX_SIZE } from "../svgUtils";
 
-export const generateOffset = (params: DuctParams) => {
-    const cx = VIEW_BOX_SIZE / 2;
-    const cy = VIEW_BOX_SIZE / 2;
+export const generateOffset = (params: DuctParams, activeField: string | null = null) => {
+    const VIEW_WIDTH = VIEW_BOX_SIZE;
+    const VIEW_HEIGHT = 500; // Reduced from 800
+    const cx = VIEW_WIDTH / 2;
+    const cy = VIEW_HEIGHT / 2;
     
     const realD = params.d1 || 500;
     const realL = params.length || 800;
@@ -84,14 +86,14 @@ export const generateOffset = (params: DuctParams) => {
     // 1. Length L (Top)
     const dimL_Y_Target = yR_Top - 40;
     const offsetL = yL_Top - dimL_Y_Target;
-    const dimL = drawDim(xL_Start, yL_Top, xR_End, yR_Top, `L=${realL}`, 'top', offsetL);
+    const dimL = drawDim(xL_Start, yL_Top, xR_End, yR_Top, `L=${realL}`, 'top', offsetL, 'length', activeField);
     
     // 2. Diameter (Left)
-    const dimD = drawDim(xL_Start - 10, yL_Top, xL_Start - 10, yL_Bot, `Ø${realD}`, 'left');
+    const dimD = drawDim(xL_Start - 10, yL_Top, xL_Start - 10, yL_Bot, `Ø${realD}`, 'left', null, 'd1', activeField);
     
     // 3. Offset H (Right side, Center-to-Center)
     const dimOffH = 60;
-    const dimH = drawDim(xR_End, cy1, xR_End, cy2, `H=${realH}`, 'right', dimOffH);
+    const dimH = drawDim(xR_End, cy1, xR_End, cy2, `H=${realH}`, 'right', dimOffH, 'offset', activeField);
     
     // Extended Axis Lines for H dimension
     // Lower Axis: Extends from the Left Start to the dimension line on the right
@@ -103,6 +105,7 @@ export const generateOffset = (params: DuctParams) => {
 
     return createSvg(
         `<path d="${bodyPath}" class="line" />` + 
-        creases + cLineSvg + f1 + f2 + axisLower + axisUpper + dimL + dimD + dimH + remark1 + remark2
+        creases + cLineSvg + f1 + f2 + axisLower + axisUpper + dimL + dimD + dimH + remark1 + remark2,
+        VIEW_WIDTH, VIEW_HEIGHT
     );
 };

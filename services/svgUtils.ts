@@ -4,9 +4,9 @@
  * Shared Utilities for SVG Generation
  */
 
-export const VIEW_BOX_SIZE = 500; // Reduced from 600 for tighter crop (Zoom In)
+export const VIEW_BOX_SIZE = 800; 
 
-// Fixed visual constants (abstract units) - Kept large for high resolution
+// Fixed visual constants (abstract units)
 export const V_CONSTANTS = {
   LEN: 330,
   DIAM: 150,
@@ -25,10 +25,10 @@ export const CFG = {
   strokeBody: 3,
   strokeFlange: 2.5,
   strokeDim: 1.5,
-  textSize: 24,
-  arrowSize: 12,
-  dimOffset: 65,      // Slightly reduced to fit tighter box
-  textOffset: 6
+  textSize: 28, 
+  arrowSize: 14,
+  dimOffset: 65,      
+  textOffset: 8
 };
 
 export const createSvg = (content: string, width: number = VIEW_BOX_SIZE, height: number = VIEW_BOX_SIZE) => {
@@ -36,33 +36,57 @@ export const createSvg = (content: string, width: number = VIEW_BOX_SIZE, height
   
   return `<svg viewBox="${viewBox}" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
     <style>
-      .line { fill: none; stroke: black; stroke-width: ${CFG.strokeBody}; stroke-linecap: round; stroke-linejoin: round; }
-      .flange { fill: white; stroke: black; stroke-width: ${CFG.strokeFlange}; }
-      .dim-line { stroke: red; stroke-width: ${CFG.strokeDim}; }
-      .dim-arrow { fill: red; stroke: none; }
-      .dim-text { fill: red; font-family: sans-serif; font-size: ${CFG.textSize}px; font-weight: bold; text-anchor: middle; paint-order: stroke fill; stroke: white; stroke-width: 4px; stroke-linejoin: round; }
+      .line { fill: none; stroke: black; stroke-width: ${CFG.strokeBody}; stroke-linecap: round; stroke-linejoin: round; transition: all 0.2s; }
+      .flange { fill: white; stroke: black; stroke-width: ${CFG.strokeFlange}; transition: all 0.2s; }
+      .dim-line { stroke: red; stroke-width: ${CFG.strokeDim}; transition: all 0.2s; pointer-events: all; }
+      .dim-arrow { fill: red; stroke: none; transition: all 0.2s; pointer-events: all; }
+      .dim-text { fill: red; font-family: sans-serif; font-size: ${CFG.textSize}px; font-weight: bold; text-anchor: middle; paint-order: stroke fill; stroke: white; stroke-width: 4px; stroke-linejoin: round; transition: all 0.2s; cursor: pointer; pointer-events: all; }
       .center-line { stroke: #999; stroke-width: 1; stroke-dasharray: 5,3; }
       .hidden-line { fill: none; stroke: black; stroke-width: 1; stroke-dasharray: 3,3; }
       .phantom-line { fill: none; stroke: #999; stroke-width: 0.5; stroke-dasharray: 10,2,2,2; }
       .npt-text { fill: #9333ea; font-family: sans-serif; font-size: ${CFG.textSize}px; font-weight: bold; text-anchor: middle; paint-order: stroke fill; stroke: white; stroke-width: 3px; }
+
+      /* Highlighting Styles */
+      .highlight { stroke: #2563eb !important; stroke-width: 4px !important; }
+      .highlight.dim-text { fill: #2563eb !important; font-size: ${CFG.textSize * 1.3}px !important; }
+      .highlight.dim-arrow { fill: #2563eb !important; }
+      
+      /* Hover Effect for Dimensions */
+      g[data-param]:hover .dim-line { stroke: #2563eb; stroke-width: 3px; }
+      g[data-param]:hover .dim-text { fill: #2563eb; }
+      g[data-param]:hover .dim-arrow { fill: #2563eb; }
     </style>
     ${content}
   </svg>`;
 };
 
-export const drawArrow = (x: number, y: number, angleDeg: number) => {
-    const size = CFG.arrowSize;
+export const drawArrow = (x: number, y: number, angleDeg: number, isHighlight: boolean = false) => {
+    const size = isHighlight ? CFG.arrowSize * 1.5 : CFG.arrowSize;
     const rad = angleDeg * Math.PI / 180;
     const x1 = x - size * Math.cos(rad - Math.PI / 6);
     const y1 = y - size * Math.sin(rad - Math.PI / 6);
     const x2 = x - size * Math.cos(rad + Math.PI / 6);
     const y2 = y - size * Math.sin(rad + Math.PI / 6);
-    return `<polygon points="${x},${y} ${x1},${y1} ${x2},${y2}" class="dim-arrow" />`;
+    const cls = isHighlight ? "dim-arrow highlight" : "dim-arrow";
+    return `<polygon points="${x},${y} ${x1},${y1} ${x2},${y2}" class="${cls}" />`;
 };
 
-export const drawDim = (x1: number, y1: number, x2: number, y2: number, text: string, offsetDir: 'top' | 'bottom' | 'left' | 'right' = 'bottom', customOffset: number | null = null) => {
+// Updated drawDim to accept an ID and the currently active ID
+export const drawDim = (
+    x1: number, y1: number, x2: number, y2: number, 
+    text: string, 
+    offsetDir: 'top' | 'bottom' | 'left' | 'right' = 'bottom', 
+    customOffset: number | null = null,
+    id: string | null = null,
+    activeId: string | null = null
+) => {
   const isVert = Math.abs(x1 - x2) < 1;
   const off = customOffset !== null ? customOffset : CFG.dimOffset;
+  const isActive = id && activeId && (id === activeId);
+
+  // Apply Highlight Classes
+  const lineClass = isActive ? "dim-line highlight" : "dim-line";
+  const textClass = isActive ? "dim-text highlight" : "dim-text";
   
   let dPath = "";
   let tx = 0, ty = 0;
@@ -77,8 +101,8 @@ export const drawDim = (x1: number, y1: number, x2: number, y2: number, text: st
     // Draw extension lines and main line
     dPath = `M${x1},${y1} L${lx},${y1} M${x2},${y2} L${lx},${y2} M${lx},${y1} L${lx},${y2}`;
     
-    arrows += drawArrow(lx, y1, -90); // Up
-    arrows += drawArrow(lx, y2, 90);  // Down
+    arrows += drawArrow(lx, y1, -90, isActive); // Up
+    arrows += drawArrow(lx, y2, 90, isActive);  // Down
     
     // Text Position: Center of line
     tx = lx;
@@ -92,8 +116,8 @@ export const drawDim = (x1: number, y1: number, x2: number, y2: number, text: st
     
     dPath = `M${x1},${y1} L${x1},${ly} M${x2},${y2} L${x2},${ly} M${x1},${ly} L${x2},${ly}`;
     
-    arrows += drawArrow(x1, ly, 180); // Left
-    arrows += drawArrow(x2, ly, 0);   // Right
+    arrows += drawArrow(x1, ly, 180, isActive); // Left
+    arrows += drawArrow(x2, ly, 0, isActive);   // Right
     
     tx = (x1 + x2) / 2;
     ty = ly; // Text on line Y
@@ -101,10 +125,15 @@ export const drawDim = (x1: number, y1: number, x2: number, y2: number, text: st
     dy = "-0.4em"; 
   }
 
+  // Wrap in a group with data-param attribute for click handling
+  const groupAttrs = id ? `data-param="${id}" style="cursor: pointer;"` : '';
+
   return `
-    <path d="${dPath}" class="dim-line" />
-    <text x="${tx}" y="${ty}" class="dim-text" transform="rotate(${rotate}, ${tx}, ${ty})" dy="${dy}">${text}</text>
-    ${arrows}
+    <g ${groupAttrs}>
+        <path d="${dPath}" class="${lineClass}" />
+        <text x="${tx}" y="${ty}" class="${textClass}" transform="rotate(${rotate}, ${tx}, ${ty})" dy="${dy}">${text}</text>
+        ${arrows}
+    </g>
   `;
 };
 

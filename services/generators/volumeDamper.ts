@@ -3,8 +3,10 @@ import { createSvg, drawDim, drawFlange, VIEW_BOX_SIZE, V_CONSTANTS } from "../s
 
 const { DIAM: V_DIAM } = V_CONSTANTS;
 
-export const generateVolumeDamper = (params: DuctParams) => {
-    const cy = VIEW_BOX_SIZE / 2 + 10; 
+export const generateVolumeDamper = (params: DuctParams, activeField: string | null = null) => {
+    const VIEW_WIDTH = VIEW_BOX_SIZE;
+    const VIEW_HEIGHT = 500; // Reduced from 800
+    const cy = VIEW_HEIGHT / 2; 
     const D = V_DIAM + 30; 
     const L = 150; 
     const cxFront = 120; 
@@ -26,15 +28,19 @@ export const generateVolumeDamper = (params: DuctParams) => {
         <line x1="${cxSide - L/2 - 15}" y1="${cy}" x2="${cxSide + L/2 + 15}" y2="${cy}" class="center-line" />
     `;
     const blade = `<ellipse cx="${cxFront}" cy="${cy}" rx="${D/2}" ry="${D/2 * 0.3}" fill="none" stroke="black" stroke-width="1" />`;
-    const dimD = drawDim(cxFront - rOuter, cy - rOuter, cxFront + rOuter, cy - rOuter, `Ø${params.d1}`, 'top');
+    
+    const dimD = drawDim(cxFront - rOuter, cy - rOuter, cxFront + rOuter, cy - rOuter, `Ø${params.d1}`, 'top', null, 'd1', activeField);
+    
     const xLeft = cxSide - L/2;
     const xRight = cxSide + L/2;
     const yTop = cy - D/2;
-    const yBot = cy + D/2;
+    // const yBot = cy + D/2; // unused
+    
     const sideRect = `<rect x="${xLeft}" y="${yTop}" width="${L}" height="${D}" class="line" />`;
     const f1 = drawFlange(xLeft, cy, D, true);
     const f2 = drawFlange(xRight, cy, D, true);
-    const dimL = drawDim(xLeft, yTop, xRight, yTop, `L=${params.length}`, 'top');
+    
+    const dimL = drawDim(xLeft, yTop, xRight, yTop, `L=${params.length}`, 'top', null, 'length', activeField);
     
     let mechanism = "";
     const pSize = 50;
@@ -60,5 +66,5 @@ export const generateVolumeDamper = (params: DuctParams) => {
         mechanism += `<line x1="${cxSide}" y1="${cy+wR}" x2="${cxSide}" y2="${cy+wR+15}" stroke="black" stroke-width="3" />`;
         mechanism += `<line x1="${cxSide-15}" y1="${cy+wR+15}" x2="${cxSide+15}" y2="${cy+wR+15}" stroke="black" stroke-width="3" />`;
     }
-    return createSvg(frontFlange + frontInner + bolts + blade + cLines + dimD + sideRect + f1 + f2 + dimL + mechanism);
+    return createSvg(frontFlange + frontInner + bolts + blade + cLines + dimD + sideRect + f1 + f2 + dimL + mechanism, VIEW_WIDTH, VIEW_HEIGHT);
 };

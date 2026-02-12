@@ -87,6 +87,30 @@ export default function App() {
     }
   };
 
+  const handleDuplicateItem = (item: OrderItem) => {
+    const newItem: OrderItem = {
+      ...item,
+      id: Date.now().toString(),
+      itemNo: 0, // Will be reindexed
+    };
+    // Add to end by default
+    const newItems = [...items, newItem];
+    setItems(reindexItems(newItems));
+  };
+
+  const handleMoveItem = (index: number, direction: 'up' | 'down') => {
+      if (direction === 'up' && index === 0) return;
+      if (direction === 'down' && index === items.length - 1) return;
+
+      const newItems = [...items];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      
+      // Swap
+      [newItems[index], newItems[targetIndex]] = [newItems[targetIndex], newItems[index]];
+      
+      setItems(reindexItems(newItems));
+  };
+
   // Triggers Edit Mode
   const handleEditClick = (item: OrderItem) => {
       setEditingItem(item);
@@ -135,8 +159,8 @@ export default function App() {
             onCancel={handleCancelMode}
         />
 
-        {/* Bottom: Preview */}
-        <div className="flex-1 relative overflow-auto bg-cad-200 print:h-auto print:overflow-visible print:bg-white print:block">
+        {/* Bottom: Preview (Updated overflow-y-auto to allow scrolling) */}
+        <div className="flex-1 relative overflow-y-auto bg-cad-200 print:h-auto print:overflow-visible print:bg-white print:block">
            {/* Print Toolbar */}
            <div className="no-print absolute top-4 right-8 z-30 flex gap-2">
               <button 
@@ -170,6 +194,8 @@ export default function App() {
                 onRemoveItem={handleRemoveItem}
                 onEditItem={handleEditClick}
                 onInsertBefore={handleInsertClick} 
+                onDuplicateItem={handleDuplicateItem}
+                onMoveItem={handleMoveItem}
             />
         </div>
       </main>
