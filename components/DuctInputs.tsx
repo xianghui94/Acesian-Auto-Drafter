@@ -1,5 +1,6 @@
 import React from 'react';
 import { DuctParams } from '../types';
+import { NumInput, TextAreaInput, SelectInput } from './InputFields';
 
 interface InputProps {
     params: DuctParams;
@@ -11,56 +12,15 @@ interface InputProps {
     onNptUpdate?: (index: number, field: string, value: any) => void;
 }
 
-// Helpers
-const NumInput = ({ label, value, onChange }: { label: string, value: number, onChange: (v: number) => void }) => (
-    <div>
-        <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">{label}</label>
-        <input 
-            type="number" 
-            value={value} 
-            onChange={(e) => onChange(Number(e.target.value))}
-            className="w-full p-1.5 border border-cad-300 rounded text-sm font-mono"
-        />
-    </div>
-);
-
-const TextInput = ({ label, value, onChange }: { label: string, value: string, onChange: (v: string) => void }) => (
-    <div>
-        <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">{label}</label>
-        <input 
-            type="text" 
-            value={value} 
-            onChange={(e) => onChange(e.target.value)}
-            className="w-full p-1.5 border border-cad-300 rounded text-sm"
-        />
-    </div>
-);
-
-const TextAreaInput = ({ label, value, onChange }: { label: string, value: string, onChange: (v: string) => void }) => (
-    <div>
-        <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">{label}</label>
-        <textarea 
-            value={value} 
-            onChange={(e) => onChange(e.target.value)}
-            className="w-full p-1.5 border border-cad-300 rounded text-sm font-sans"
-            rows={3}
-        />
-    </div>
-);
-
 export const ElbowInputs: React.FC<InputProps> = ({ params, onChange }) => (
     <>
         <NumInput label="D1 (mm)" value={params.d1} onChange={v => onChange('d1', v)} />
-        <div>
-            <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Angle (°)</label>
-            <select 
-                value={params.angle}
-                onChange={(e) => onChange('angle', Number(e.target.value))}
-                className="w-full p-1.5 border border-cad-300 rounded text-sm bg-white font-mono"
-            >
-                {[30, 45, 60, 90].map(deg => <option key={deg} value={deg}>{deg}</option>)}
-            </select>
-        </div>
+        <SelectInput 
+            label="Angle (°)" 
+            value={params.angle} 
+            options={[30, 45, 60, 90]} 
+            onChange={v => onChange('angle', Number(v))} 
+        />
         <NumInput label="Radius R (mm)" value={params.radius} onChange={v => onChange('radius', v)} />
         
         {/* Extensions */}
@@ -152,17 +112,12 @@ export const VolumeDamperInputs: React.FC<InputProps> = ({ params, onChange }) =
                 className="w-full p-1.5 border border-cad-200 bg-cad-50 rounded text-sm font-mono text-cad-500 cursor-not-allowed"
             />
         </div>
-        <div>
-        <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Actuation</label>
-        <select 
-            value={params.actuation}
-            onChange={(e) => onChange('actuation', e.target.value)}
-            className="w-full p-1.5 border border-cad-300 rounded text-sm bg-white"
-        >
-            <option value="Handle">Handle</option>
-            <option value="Worm Gear">Worm Gear</option>
-        </select>
-    </div>
+        <SelectInput 
+            label="Actuation" 
+            value={params.actuation} 
+            options={["Handle", "Worm Gear"]} 
+            onChange={v => onChange('actuation', v)} 
+        />
     </>
 );
 
@@ -178,17 +133,12 @@ export const MultibladeDamperInputs: React.FC<InputProps> = ({ params, onChange 
                 className="w-full p-1.5 border border-cad-200 bg-cad-50 rounded text-sm font-mono text-cad-500 cursor-not-allowed"
             />
         </div>
-        <div>
-        <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Blade Type</label>
-        <select 
-            value={params.bladeType}
-            onChange={(e) => onChange('bladeType', e.target.value)}
-            className="w-full p-1.5 border border-cad-300 rounded text-sm bg-white"
-        >
-            <option value="Parallel">Parallel</option>
-            <option value="Opposed">Opposed</option>
-        </select>
-    </div>
+        <SelectInput 
+            label="Blade Type" 
+            value={params.bladeType} 
+            options={["Parallel", "Opposed"]} 
+            onChange={v => onChange('bladeType', v)} 
+        />
     </>
 );
 
@@ -196,7 +146,7 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
     params, 
     onChange, 
     onTapQtyChange, 
-    onNptQtyChange,
+    onNptQtyChange, 
     onTapUpdate, 
     onNptUpdate 
 }) => (
@@ -205,20 +155,16 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
         <NumInput label="Total L (mm)" value={params.length} onChange={v => onChange('length', v)} />
         
         <div className="flex gap-2">
-        <NumInput label="Qty Taps" value={params.tapQty || 0} onChange={onTapQtyChange!} />
-        <NumInput label="Qty NPT" value={params.nptQty || 0} onChange={onNptQtyChange!} />
+            <NumInput label="Qty Taps" value={params.tapQty || 0} onChange={onTapQtyChange!} />
+            <NumInput label="Qty NPT" value={params.nptQty || 0} onChange={onNptQtyChange!} />
         </div>
         
-        <div>
-        <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Seam Pos (°)</label>
-        <select 
-            value={params.seamAngle !== undefined ? params.seamAngle : 0}
-            onChange={(e) => onChange('seamAngle', Number(e.target.value))}
-            className="w-full p-1.5 border border-cad-300 rounded text-sm bg-white font-mono"
-        >
-            {[0, 45, 90, 135, 180, 225, 270, 315].map(deg => <option key={deg} value={deg}>{deg}</option>)}
-        </select>
-        </div>
+        <SelectInput 
+            label="Seam Pos (°)" 
+            value={params.seamAngle !== undefined ? params.seamAngle : 0} 
+            options={[0, 45, 90, 135, 180, 225, 270, 315]} 
+            onChange={v => onChange('seamAngle', Number(v))} 
+        />
         
         {/* Flange Remarks */}
         <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
@@ -246,27 +192,27 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
                                 type="number" 
                                 value={tap.dist} 
                                 onChange={(e) => onTapUpdate!(idx, 'dist', Number(e.target.value))}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full"
+                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
                                 placeholder="Dist"
                             />
                             <input 
                                 type="number" 
                                 value={tap.diameter} 
                                 onChange={(e) => onTapUpdate!(idx, 'diameter', Number(e.target.value))}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full"
+                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
                                 placeholder="Dia"
                             />
                                 <input 
                                 type="number" 
                                 value={tap.angle} 
                                 onChange={(e) => onTapUpdate!(idx, 'angle', Number(e.target.value))}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full"
+                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
                                 placeholder="0"
                             />
                             <textarea
                                 value={tap.remark || ""} 
                                 onChange={(e) => onTapUpdate!(idx, 'remark', e.target.value)}
-                                className="col-span-5 p-1 border border-cad-300 rounded text-xs w-full resize-y font-sans leading-tight"
+                                className="col-span-5 p-1 border border-cad-300 rounded text-xs w-full resize-y font-sans leading-tight focus:border-blue-500 outline-none"
                                 placeholder="Optional..."
                                 rows={2}
                                 style={{ minHeight: '32px' }}
@@ -300,13 +246,13 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
                                 type="number" 
                                 value={port.dist} 
                                 onChange={(e) => onNptUpdate!(idx, 'dist', Number(e.target.value))}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full"
+                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
                                 placeholder="Dist"
                             />
                             <select
                                 value={port.size}
                                 onChange={(e) => onNptUpdate!(idx, 'size', e.target.value)}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full"
+                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
                             >
                                 <option value='1/2"'>1/2"</option>
                                 <option value='1"'>1"</option>
@@ -317,13 +263,13 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
                                 type="number" 
                                 value={port.angle} 
                                 onChange={(e) => onNptUpdate!(idx, 'angle', Number(e.target.value))}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full"
+                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
                                 placeholder="0"
                             />
                             <textarea
                                 value={port.remark || ""} 
                                 onChange={(e) => onNptUpdate!(idx, 'remark', e.target.value)}
-                                className="col-span-5 p-1 border border-cad-300 rounded text-xs w-full resize-y font-sans leading-tight"
+                                className="col-span-5 p-1 border border-cad-300 rounded text-xs w-full resize-y font-sans leading-tight focus:border-blue-500 outline-none"
                                 placeholder="Optional..."
                                 rows={2}
                                 style={{ minHeight: '32px' }}

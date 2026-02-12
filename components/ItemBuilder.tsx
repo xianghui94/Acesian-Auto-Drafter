@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { ComponentType, DuctParams } from '../types';
+import { ComponentType, DuctParams, OrderItem } from '../types';
 import { generateDuctDrawing } from '../services/geminiService';
 import * as Inputs from './DuctInputs';
 
 interface ItemBuilderProps {
-  onAddItem: (item: any) => void;
+  onSave: (item: any) => void;
+  editingItem: OrderItem | null;
+  insertIndex: number | null;
+  onCancel: () => void;
 }
 
-export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
+export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, insertIndex, onCancel }) => {
   const [componentType, setComponentType] = useState<ComponentType>(ComponentType.ELBOW);
   const [isConfigOpen, setIsConfigOpen] = useState(true);
   
@@ -24,12 +27,40 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
     notes: ""
   });
 
+  // Load Edit Data
+  useEffect(() => {
+    if (editingItem) {
+        setComponentType(editingItem.componentType);
+        // We defer param setting slightly to ensure componentType switch doesn't overwrite it with defaults
+        // But since React batches, we can set them here. 
+        // We just need to guard the default-setter effect below.
+        setParams(editingItem.params);
+        setMeta({
+            material: editingItem.material,
+            thickness: editingItem.thickness,
+            qty: editingItem.qty,
+            coating: editingItem.coating,
+            tagNo: editingItem.tagNo,
+            notes: editingItem.notes
+        });
+        setIsConfigOpen(true);
+    } else {
+        // Reset if we just exited edit mode? 
+        // Optional: Keep last used values or reset. Let's keep last used to allow rapid entry.
+        // However, if we just saved, we might want to clear Tag No.
+    }
+  }, [editingItem]);
+
   // Update defaults based on component type
   useEffect(() => {
+    // GUARD: If we are currently editing an item AND that item's type matches the current type,
+    // do NOT overwrite params with defaults. This allows loading the edit item correctly.
+    if (editingItem && editingItem.componentType === componentType) {
+        return;
+    }
+
     switch (componentType) {
       case ComponentType.ELBOW: 
-        // Initial defaults for Elbow
-        // Default D=500. For D>=200, we use Throat R = 0.5D -> 250
         setParams({ d1: 500, angle: 90, radius: 250, extension1: 0, extension2: 0, flangeRemark1: "", flangeRemark2: "" }); 
         break;
       case ComponentType.REDUCER: 
@@ -44,9 +75,9 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
             tap_d: 300, 
             length: 500, 
             branch_l: 100, 
-            flangeRemark1: "", // Left
-            flangeRemark2: "", // Right
-            flangeRemark3: ""  // Branch
+            flangeRemark1: "", 
+            flangeRemark2: "",
+            flangeRemark3: ""
         }); 
         break;
       case ComponentType.TRANSFORMATION: setParams({ d1: 500, width: 500, height: 500, length: 300, flangeRemark1: "", flangeRemark2: "" }); break;
@@ -75,51 +106,34 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
     if (componentType === ComponentType.BLIND_PLATE) {
         setMeta(prev => ({ ...prev, thickness: "3.0" }));
     } else if (componentType === ComponentType.ANGLE_FLANGE) {
-        // Default is bare (Coating: No)
         setMeta(prev => ({ ...prev, coating: "No" }));
     } else if (componentType === ComponentType.OFFSET) {
-        // Initial check for Offset thickness default
         setMeta(prev => ({ ...prev, thickness: "0.9" }));
     } else {
         // Reset to standard duct thickness if it was the blind plate default
         setMeta(prev => (prev.thickness === "3.0" ? { ...prev, thickness: "0.8" } : prev));
     }
 
-  }, [componentType]);
+  }, [componentType, editingItem]);
 
   const handleParamChange = (key: string, val: any) => {
     let newParams = { ...params, [key]: val };
     
-    // Elbow Radius Auto-calc logic: 
-    // If Diameter changes, update Radius.
-    // "R" refers to Inner/Throat Radius.
-    // D < 200: Centerline ~ 1.5D => Inner ~ 1.0D
-    // D >= 200: Centerline ~ 1.0D => Inner ~ 0.5D
+    // Auto-calc logic
     if (componentType === ComponentType.ELBOW && key === 'd1') {
         const d = Number(val);
         newParams.radius = (d < 200) ? d * 1.0 : d * 0.5;
     }
-
-    // Special logic for Volume Damper Length
     if (componentType === ComponentType.VOLUME_DAMPER && key === 'd1') {
         const d = Number(val);
-        if (d <= 200) {
-            newParams.length = 150;
-        } else {
-            newParams.length = 224;
-        }
+        newParams.length = (d <= 200) ? 150 : 224;
     }
-    // Multiblade Damper fixed length
     if (componentType === ComponentType.MULTIBLADE_DAMPER && key === 'd1') {
         newParams.length = 400;
     }
-
-    // Tee Length Auto-calc (L = Bd + 200)
     if (componentType === ComponentType.TEE && key === 'tap_d') {
         newParams.length = Number(val) + 200;
     }
-
-    // Offset Thickness Logic (Based on Table)
     if (componentType === ComponentType.OFFSET && key === 'd1') {
         const d = Number(val);
         let thk = "0.9";
@@ -139,15 +153,12 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
       let newTaps = [...currentTaps];
       
       if (newQty > newTaps.length) {
-          // Add new taps with defaults
           for (let i = newTaps.length; i < newQty; i++) {
               newTaps.push({ dist: 100, diameter: 100, angle: 0, remark: "" });
           }
       } else if (newQty < newTaps.length) {
-          // Remove from end
           newTaps = newTaps.slice(0, newQty);
       }
-      
       setParams({ ...params, tapQty: newQty, taps: newTaps });
   };
 
@@ -157,15 +168,12 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
       let newPorts = [...currentPorts];
       
       if (newQty > newPorts.length) {
-          // Add new ports with defaults
           for (let i = newPorts.length; i < newQty; i++) {
               newPorts.push({ dist: 100, size: '1"', angle: 0, remark: "" });
           }
       } else if (newQty < newPorts.length) {
-          // Remove from end
           newPorts = newPorts.slice(0, newQty);
       }
-      
       setParams({ ...params, nptQty: newQty, nptPorts: newPorts });
   };
 
@@ -185,11 +193,11 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
       }
   };
 
-  const handleAdd = async () => {
-    // Auto-generate sketch (Instant now)
+  const handleSave = async () => {
+    // Generate Sketch
     let svg = await generateDuctDrawing(componentType, params);
 
-    // Simplified description
+    // Generate Description
     let description = componentType.split(' ')[0]; // Default fallback
     
     if (componentType === ComponentType.STRAIGHT) {
@@ -227,7 +235,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
         }
     }
     
-    onAddItem({
+    onSave({
       componentType,
       params,
       ...meta,
@@ -235,50 +243,37 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
       sketchSvg: svg
     });
 
-    // Reset meta for next item (keep params)
-    setMeta(prev => ({ ...prev, tagNo: "", qty: 1, notes: "" }));
+    // Reset meta for next item if just adding, but keep params for rapid entry
+    if (!editingItem) {
+        setMeta(prev => ({ ...prev, tagNo: "", qty: 1, notes: "" }));
+    }
   };
 
   const renderParamsInputs = () => {
     switch (componentType) {
-      case ComponentType.ELBOW:
-        return <Inputs.ElbowInputs params={params} onChange={handleParamChange} />;
-      case ComponentType.REDUCER:
-        return <Inputs.ReducerInputs params={params} onChange={handleParamChange} />;
-      case ComponentType.STRAIGHT:
-        return <Inputs.StraightInputs params={params} onChange={handleParamChange} />;
-      case ComponentType.TEE:
-        return <Inputs.TeeInputs params={params} onChange={handleParamChange} />;
-      case ComponentType.TRANSFORMATION:
-        return <Inputs.TransformationInputs params={params} onChange={handleParamChange} />;
-      case ComponentType.VOLUME_DAMPER:
-        return <Inputs.VolumeDamperInputs params={params} onChange={handleParamChange} />;
-      case ComponentType.MULTIBLADE_DAMPER:
-        return <Inputs.MultibladeDamperInputs params={params} onChange={handleParamChange} />;
-      case ComponentType.STRAIGHT_WITH_TAPS:
-        return (
-            <Inputs.StraightWithTapsInputs 
-                params={params} 
-                onChange={handleParamChange} 
-                onTapQtyChange={handleTapQtyChange}
-                onNptQtyChange={handleNptQtyChange}
-                onTapUpdate={handleTapUpdate}
-                onNptUpdate={handleNptUpdate}
-            />
-        );
-      case ComponentType.BLIND_PLATE:
-        return <Inputs.BlindPlateInputs params={params} onChange={handleParamChange} />;
-      case ComponentType.BLAST_GATE_DAMPER:
-        return <Inputs.BlastGateDamperInputs params={params} onChange={handleParamChange} />;
-      case ComponentType.ANGLE_FLANGE:
-        return <Inputs.AngleFlangeInputs params={params} onChange={handleParamChange} />;
-      case ComponentType.OFFSET:
-        return <Inputs.OffsetInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.ELBOW: return <Inputs.ElbowInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.REDUCER: return <Inputs.ReducerInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.STRAIGHT: return <Inputs.StraightInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.TEE: return <Inputs.TeeInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.TRANSFORMATION: return <Inputs.TransformationInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.VOLUME_DAMPER: return <Inputs.VolumeDamperInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.MULTIBLADE_DAMPER: return <Inputs.MultibladeDamperInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.STRAIGHT_WITH_TAPS: return <Inputs.StraightWithTapsInputs params={params} onChange={handleParamChange} onTapQtyChange={handleTapQtyChange} onNptQtyChange={handleNptQtyChange} onTapUpdate={handleTapUpdate} onNptUpdate={handleNptUpdate} />;
+      case ComponentType.BLIND_PLATE: return <Inputs.BlindPlateInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.BLAST_GATE_DAMPER: return <Inputs.BlastGateDamperInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.ANGLE_FLANGE: return <Inputs.AngleFlangeInputs params={params} onChange={handleParamChange} />;
+      case ComponentType.OFFSET: return <Inputs.OffsetInputs params={params} onChange={handleParamChange} />;
     }
   };
 
+  const getModeLabel = () => {
+      if (editingItem) return `EDITING ITEM #${editingItem.itemNo}`;
+      if (insertIndex !== null) return `INSERTING AT ITEM #${insertIndex + 1}`;
+      return "ADD NEW ITEM";
+  };
+
   return (
-    <div className="no-print bg-white border-b border-cad-200 p-4 shadow-sm z-20 transition-all duration-300">
+    <div className={`no-print bg-white border-b border-cad-200 p-4 shadow-sm z-20 transition-all duration-300 ${editingItem ? 'border-l-4 border-l-orange-500' : insertIndex !== null ? 'border-l-4 border-l-green-500' : ''}`}>
       <div className="flex flex-col gap-4">
         
         {/* Header / Component Selector Row */}
@@ -293,7 +288,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
                 </select>
                 <div className="h-6 w-px bg-cad-200"></div>
                 <h3 className="text-sm font-bold text-cad-500 uppercase flex items-center gap-2">
-                    Item Config
+                    {getModeLabel()}
                 </h3>
             </div>
             
@@ -301,17 +296,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
                 onClick={() => setIsConfigOpen(!isConfigOpen)}
                 className="text-cad-500 hover:text-cad-800 text-xs font-bold uppercase tracking-wider flex items-center gap-1 p-2 rounded hover:bg-cad-50"
             >
-                {isConfigOpen ? (
-                    <>
-                        <span>Hide Config</span>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                    </>
-                ) : (
-                    <>
-                        <span>Show Config</span>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </>
-                )}
+                {isConfigOpen ? "Hide Config" : "Show Config"}
             </button>
         </div>
 
@@ -323,7 +308,6 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
                     <TextInput label="Material" value={meta.material} onChange={v => setMeta(m => ({...m, material: v}))} />
                     <TextInput label="Thk (mm)" value={meta.thickness} onChange={v => setMeta(m => ({...m, thickness: v}))} />
                     
-                    {/* Coating Dropdown */}
                     <div>
                         <label className="block text-[10px] uppercase font-bold text-cad-400 mb-1">Coating</label>
                         <select
@@ -353,12 +337,24 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onAddItem }) => {
                 />
                 </div>
                 
-                <div className="flex justify-end pt-2 border-t border-cad-100 mt-2">
+                <div className="flex justify-end pt-2 border-t border-cad-100 mt-2 gap-2">
+                    {(editingItem || insertIndex !== null) && (
+                        <button 
+                            onClick={onCancel}
+                            className="px-6 py-3 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 font-bold text-sm"
+                        >
+                            Cancel
+                        </button>
+                    )}
                     <button 
-                        onClick={handleAdd}
-                        className="px-8 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold text-sm shadow-sm flex items-center gap-2 transition-all active:scale-95"
+                        onClick={handleSave}
+                        className={`px-8 py-3 rounded text-white font-bold text-sm shadow-sm flex items-center gap-2 transition-all active:scale-95 ${
+                            editingItem ? 'bg-orange-600 hover:bg-orange-700' : 
+                            insertIndex !== null ? 'bg-green-600 hover:bg-green-700' : 
+                            'bg-blue-600 hover:bg-blue-700'
+                        }`}
                     >
-                        + Add Item to Order Sheet
+                        {editingItem ? '💾 Save Changes' : insertIndex !== null ? '⇩ Insert Item' : '+ Add Item to Order Sheet'}
                     </button>
                 </div>
             </div>

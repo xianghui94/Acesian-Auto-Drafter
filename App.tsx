@@ -26,22 +26,84 @@ export default function App() {
 
   // Items State
   const [items, setItems] = useState<OrderItem[]>([]);
+  
+  // Edit / Insert Mode State
+  const [editingItem, setEditingItem] = useState<OrderItem | null>(null);
+  const [insertIndex, setInsertIndex] = useState<number | null>(null);
+
+  // Helper: Re-calculate Item Numbers sequentially
+  const reindexItems = (list: OrderItem[]): OrderItem[] => {
+      return list.map((item, index) => ({
+          ...item,
+          itemNo: index + 1
+      }));
+  };
 
   const handleHeaderChange = (field: keyof OrderHeader, value: string) => {
     setHeader(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleAddItem = (itemData: any) => {
-    const newItem: OrderItem = {
-      id: Date.now().toString(),
-      itemNo: items.length + 1,
-      ...itemData
-    };
-    setItems(prev => [...prev, newItem]);
+  // Central Save Handler (Add / Update / Insert)
+  const handleSaveItem = (itemData: any) => {
+    let newItems = [...items];
+
+    if (editingItem) {
+        // Update Existing Item
+        newItems = newItems.map(item => 
+            item.id === editingItem.id 
+                ? { ...item, ...itemData, id: item.id } // Preserve ID
+                : item
+        );
+        setEditingItem(null);
+    } else if (insertIndex !== null) {
+        // Insert at specific index (Insert Before)
+        const newItem: OrderItem = {
+            id: Date.now().toString(),
+            itemNo: 0, // Will be fixed by reindex
+            ...itemData
+        };
+        newItems.splice(insertIndex, 0, newItem);
+        setInsertIndex(null);
+    } else {
+        // Standard Add (Append to end)
+        const newItem: OrderItem = {
+            id: Date.now().toString(),
+            itemNo: 0,
+            ...itemData
+        };
+        newItems.push(newItem);
+    }
+
+    setItems(reindexItems(newItems));
   };
 
   const handleRemoveItem = (id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id));
+    const newItems = items.filter(item => item.id !== id);
+    setItems(reindexItems(newItems));
+    
+    // If we removed the item currently being edited, cancel edit mode
+    if (editingItem && editingItem.id === id) {
+        setEditingItem(null);
+    }
+  };
+
+  // Triggers Edit Mode
+  const handleEditClick = (item: OrderItem) => {
+      setEditingItem(item);
+      setInsertIndex(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Triggers Insert Mode
+  const handleInsertClick = (index: number) => {
+      setInsertIndex(index);
+      setEditingItem(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelMode = () => {
+      setEditingItem(null);
+      setInsertIndex(null);
   };
 
   const handlePrint = () => {
@@ -66,7 +128,12 @@ export default function App() {
       <main className="flex-1 flex flex-col h-full relative overflow-hidden print:h-auto print:overflow-visible print:block">
         
         {/* Top: Item Builder */}
-        <ItemBuilder onAddItem={handleAddItem} />
+        <ItemBuilder 
+            onSave={handleSaveItem} 
+            editingItem={editingItem}
+            insertIndex={insertIndex}
+            onCancel={handleCancelMode}
+        />
 
         {/* Bottom: Preview */}
         <div className="flex-1 relative overflow-auto bg-cad-200 print:h-auto print:overflow-visible print:bg-white print:block">
@@ -97,7 +164,13 @@ export default function App() {
               </button>
            </div>
 
-           <OrderSheet header={header} items={items} onRemoveItem={handleRemoveItem} />
+           <OrderSheet 
+                header={header} 
+                items={items} 
+                onRemoveItem={handleRemoveItem}
+                onEditItem={handleEditClick}
+                onInsertBefore={handleInsertClick} 
+            />
         </div>
       </main>
     </div>

@@ -261,11 +261,13 @@ const drawDimensionStack = (
     const botDims: typeof features = [];
 
     features.forEach(f => {
-        // Orientation logic to decide top vs bottom placement for dimensions
+        // Correct Logic: 
+        // Left (270deg) sticks UP -> Top Dims
+        // Right (90deg) sticks DOWN -> Bot Dims
         if (f.orientation === 'LEFT' || f.orientation === 'TOP_LEFT' || f.orientation === 'BOT_LEFT') {
-            botDims.push(f);
-        } else if (f.orientation === 'RIGHT' || f.orientation === 'TOP_RIGHT' || f.orientation === 'BOT_RIGHT') {
             topDims.push(f);
+        } else if (f.orientation === 'RIGHT' || f.orientation === 'TOP_RIGHT' || f.orientation === 'BOT_RIGHT') {
+            botDims.push(f);
         } else {
             // Balance vertical taps
             if (topDims.length <= botDims.length) topDims.push(f);

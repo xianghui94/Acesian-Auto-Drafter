@@ -5,21 +5,13 @@ interface OrderSheetProps {
   header: OrderHeader;
   items: OrderItem[];
   onRemoveItem: (id: string) => void;
+  onEditItem: (item: OrderItem) => void;
+  onInsertBefore: (index: number) => void;
 }
 
 const ITEMS_PER_PAGE = 6;
 
-// --- IMAGE INSTRUCTIONS ---
-// To make the logos appear when deployed to Vercel:
-// 1. Create a folder named "public" in your project root (same level as index.html).
-// 2. Place your image files inside that folder.
-// 3. Ensure they are named exactly: 
-//    - logo_acesian.png
-//    - logo_cmt.png
-//    - logo_gic_ukas.png
-// 4. Vercel/Vite will automatically serve them at the paths used below (e.g., src="/logo_acesian.png").
-
-export const OrderSheet: React.FC<OrderSheetProps> = ({ header, items, onRemoveItem }) => {
+export const OrderSheet: React.FC<OrderSheetProps> = ({ header, items, onRemoveItem, onEditItem, onInsertBefore }) => {
   
   // Split items into pages
   const pages = [];
@@ -42,6 +34,8 @@ export const OrderSheet: React.FC<OrderSheetProps> = ({ header, items, onRemoveI
           totalPages={pages.length}
           startIndex={pageIndex * ITEMS_PER_PAGE}
           onRemoveItem={onRemoveItem}
+          onEditItem={onEditItem}
+          onInsertBefore={onInsertBefore}
         />
       ))}
     </div>
@@ -50,7 +44,7 @@ export const OrderSheet: React.FC<OrderSheetProps> = ({ header, items, onRemoveI
 
 // --- Subcomponents ---
 
-const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemoveItem }: any) => {
+const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemoveItem, onEditItem, onInsertBefore }: any) => {
   // Fill empty slots to always show grid lines for 6 items
   const paddedItems = [...items];
   while (paddedItems.length < ITEMS_PER_PAGE) {
@@ -155,7 +149,7 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
              {paddedItems.map((item: OrderItem | null, idx: number) => (
                  <div 
                     key={item ? item.id : `empty-${idx}`} 
-                    className="w-1/2 border-b border-r border-black relative box-border even:border-r-0 flex flex-col overflow-hidden"
+                    className="w-1/2 border-b border-r border-black relative box-border even:border-r-0 flex flex-col overflow-hidden group"
                     style={{ height: ITEM_HEIGHT }}
                  >
                      {item ? (
@@ -190,7 +184,7 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
                            </div>
 
                            {/* Sketch Area */}
-                           <div className="flex-1 w-full flex items-center justify-center overflow-hidden p-1 min-h-0 relative group">
+                           <div className="flex-1 w-full flex items-center justify-center overflow-hidden p-1 min-h-0 relative">
                                {item.sketchSvg && (
                                   <div 
                                     className="w-full h-full flex items-center justify-center"
@@ -204,13 +198,30 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
                                <span className="font-bold mr-1">Note:</span>{item.notes}
                            </div>
                            
-                           {/* Remove Button (No Print) */}
-                           <button 
-                             onClick={() => onRemoveItem(item.id)}
-                             className="no-print absolute top-1 right-1 text-red-400 hover:text-red-600 font-bold px-1 bg-white z-10"
-                           >
-                             ✕
-                           </button>
+                           {/* Action Buttons (No Print) */}
+                           <div className="no-print absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 p-1 rounded border border-gray-200 shadow-sm z-20">
+                             <button 
+                               onClick={() => onInsertBefore(startIndex + idx)}
+                               className="text-green-600 hover:text-green-800 text-[10px] font-bold px-1.5 py-0.5 bg-green-50 rounded border border-green-200"
+                               title="Insert new item before this one"
+                             >
+                               + Insert
+                             </button>
+                             <button 
+                               onClick={() => onEditItem(item)}
+                               className="text-blue-600 hover:text-blue-800 text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 rounded border border-blue-200"
+                               title="Edit Item"
+                             >
+                               ✎ Edit
+                             </button>
+                             <button 
+                               onClick={() => onRemoveItem(item.id)}
+                               className="text-red-600 hover:text-red-800 text-[10px] font-bold px-1.5 py-0.5 bg-red-50 rounded border border-red-200"
+                               title="Remove Item"
+                             >
+                               ✕
+                             </button>
+                           </div>
                         </>
                      ) : (
                         <div className="w-full h-full"></div>
