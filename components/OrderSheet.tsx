@@ -190,7 +190,7 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
                            </div>
 
                            {/* Sketch Area */}
-                           <div className="flex-1 w-full flex items-center justify-center overflow-hidden p-1 min-h-0">
+                           <div className="flex-1 w-full flex items-center justify-center overflow-hidden p-1 min-h-0 relative group">
                                {item.sketchSvg && (
                                   <div 
                                     className="w-full h-full flex items-center justify-center"
