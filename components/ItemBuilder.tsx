@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ComponentType, DuctParams, OrderItem } from '../types';
 import { generateDuctDrawing } from '../services/geminiService';
@@ -19,7 +20,7 @@ const getDefaultParams = (type: ComponentType): DuctParams => {
       case ComponentType.REDUCER: return { d1: 500, d2: 300, length: 300, extension1: 50, extension2: 50, reducerType: "Concentric" };
       case ComponentType.STRAIGHT: return { d1: 300, length: 1200 };
       case ComponentType.TEE: return { main_d: 500, tap_d: 300, length: 500, branch_l: 100 };
-      case ComponentType.TRANSFORMATION: return { d1: 500, width: 500, height: 500, length: 300 };
+      case ComponentType.TRANSFORMATION: return { d1: 500, width: 500, height: 500, length: 300, offset: 0 };
       case ComponentType.VOLUME_DAMPER: return { d1: 200, length: 150, actuation: "Handle" };
       case ComponentType.MULTIBLADE_DAMPER: return { d1: 700, length: 400, bladeType: "Parallel" };
       case ComponentType.STRAIGHT_WITH_TAPS: return { d1: 500, length: 1200, tapQty: 1, nptQty: 0, seamAngle: 0, taps: [{ dist: 600, diameter: 150, angle: 0 }], nptPorts: [] };
@@ -32,7 +33,7 @@ const getDefaultParams = (type: ComponentType): DuctParams => {
           const f = getFlangeParams(800);
           return { d1: 800, pcd: f.bcd, holeCount: f.holeCount };
       }
-      case ComponentType.OFFSET: return { d1: 500, length: 800, offset: 200 };
+      case ComponentType.OFFSET: return { d1: 500, d2: 500, length: 800, offset: 200 };
       case ComponentType.SADDLE: return { d1: 1000, d2: 450, length: 100 };
       case ComponentType.MANUAL: return { userDescription: "" };
       default: return {};
@@ -196,12 +197,16 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         if (shouldAutoCalc('pcd')) newParams.pcd = std.bcd;
         if (shouldAutoCalc('holeCount')) newParams.holeCount = std.holeCount;
     }
-    
-    setParams(newParams);
-    
-    // Offset Thickness Logic (Updates Metadata)
+
+    // Offset Logic
     if (componentType === ComponentType.OFFSET && key === 'd1') {
         const d = Number(val);
+        // Sync D2 if not modified by user
+        if (shouldAutoCalc('d2')) {
+            newParams.d2 = d;
+        }
+
+        // Thickness Logic
         let thk = "0.9";
         if (d <= 500) thk = "0.9";
         else if (d <= 650) thk = "1.2";
@@ -209,6 +214,8 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         else thk = "2.0";
         setMeta(prev => ({...prev, thickness: thk}));
     }
+    
+    setParams(newParams);
   };
 
   // --- Tap/NPT Handlers ---
@@ -251,6 +258,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         description = "Straight Duct";
     } else if (componentType === ComponentType.TRANSFORMATION) {
         description = "Transformation Sq-Rd";
+        if (params.offset && params.offset !== 0) description += ` (Offset H=${params.offset})`;
     } else if (componentType === ComponentType.VOLUME_DAMPER) {
         description = `VCD (${params.actuation})`;
     } else if (componentType === ComponentType.MULTIBLADE_DAMPER) {
@@ -269,7 +277,11 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
     } else if (componentType === ComponentType.TEE) {
         description = `Tee Ø${params.main_d} / Ø${params.tap_d}`;
     } else if (componentType === ComponentType.OFFSET) {
-        description = `Offset Ø${params.d1} / L=${params.length} / H=${params.offset}`;
+        if (params.d1 !== params.d2) {
+             description = `Reducing Offset Ø${params.d1}-Ø${params.d2} / L=${params.length} / H=${params.offset}`;
+        } else {
+             description = `Offset Ø${params.d1} / L=${params.length} / H=${params.offset}`;
+        }
     } else if (componentType === ComponentType.ELBOW) {
         description = `Elbow Ø${params.d1} / ${params.angle}° / R${params.radius}`;
         if (params.extension1 > 0 || params.extension2 > 0) description += ` / Ext:${params.extension1 || 0}+${params.extension2 || 0}`;

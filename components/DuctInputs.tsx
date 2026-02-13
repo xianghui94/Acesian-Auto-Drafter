@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { DuctParams } from '../types';
 import { NumInput, TextAreaInput, SelectInput } from './InputFields';
@@ -104,6 +105,7 @@ export const TransformationInputs: React.FC<InputProps> = ({ params, onChange, o
         <NumInput label="Rect L" fieldId="width" value={params.width} onChange={v => onChange('width', v)} onFocus={onFocus} onBlur={onBlur} />
         <NumInput label="Rect W" fieldId="height" value={params.height} onChange={v => onChange('height', v)} onFocus={onFocus} onBlur={onBlur} />
         <NumInput label="Length L" fieldId="length" value={params.length} onChange={v => onChange('length', v)} onFocus={onFocus} onBlur={onBlur} />
+        <NumInput label="Offset H" fieldId="offset" value={params.offset || 0} onChange={v => onChange('offset', v)} onFocus={onFocus} onBlur={onBlur} />
 
         {/* Flange Remarks */}
         <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
@@ -336,7 +338,8 @@ export const AngleFlangeInputs: React.FC<InputProps> = ({ params, onChange, onFo
 
 export const OffsetInputs: React.FC<InputProps> = ({ params, onChange, onFocus, onBlur }) => (
     <>
-        <NumInput label="Diameter Ø" fieldId="d1" value={params.d1} onChange={v => onChange('d1', v)} onFocus={onFocus} onBlur={onBlur} />
+        <NumInput label="Diameter Ø (D1)" fieldId="d1" value={params.d1} onChange={v => onChange('d1', v)} onFocus={onFocus} onBlur={onBlur} />
+        <NumInput label="Diameter Ø (D2)" fieldId="d2" value={params.d2} onChange={v => onChange('d2', v)} onFocus={onFocus} onBlur={onBlur} />
         <NumInput label="Length L" fieldId="length" value={params.length} onChange={v => onChange('length', v)} onFocus={onFocus} onBlur={onBlur} />
         <NumInput label="Offset H" fieldId="offset" value={params.offset} onChange={v => onChange('offset', v)} onFocus={onFocus} onBlur={onBlur} />
         

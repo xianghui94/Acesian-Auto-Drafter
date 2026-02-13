@@ -1,3 +1,4 @@
+
 import { DuctParams } from "../../types";
 import { createSvg, drawDim, drawFlange, drawAnnotation, VIEW_BOX_SIZE, V_CONSTANTS } from "../svgUtils";
 
@@ -11,6 +12,9 @@ export const generateTransformation = (params: DuctParams, activeField: string |
     
     const realD = params.d1 || 500;
     const realS = params.height || 500; 
+    const realH = params.offset || 0; // Vertical Offset
+
+    // Visual Calculation for D and S (Diameter and Square Height)
     const BASE_MAX = 200; 
     let D, S;
     if (realD >= realS) {
@@ -19,16 +23,33 @@ export const generateTransformation = (params: DuctParams, activeField: string |
         S = BASE_MAX; D = BASE_MAX * (realD / realS);
     }
     D = Math.max(D, 80); S = Math.max(S, 80);
+
+    // Visual Calculation for Offset H
+    // We scale the offset relative to the larger dimension (D or S)
+    const maxRealDim = Math.max(realD, realS);
+    const maxVisDim = Math.max(D, S);
+    const ratio = maxVisDim / maxRealDim;
+    // Limit visual offset so it doesn't fly off screen
+    const V_OFFSET = Math.max(-150, Math.min(150, realH * ratio)); 
+
     const L = V_TRANS_LEN;
     const T = V_TRANS_TAN;
     const xLeft = cx - L/2;
     const xRight = cx + L/2;
     const xT1 = xLeft + T;
     const xT2 = xRight - T;
+    
+    // Round Side (Left) - Fixed at CY
     const yRoundTop = cy - D/2;
     const yRoundBot = cy + D/2;
-    const yRectTop = cy - S/2;
-    const yRectBot = cy + S/2;
+    
+    // Rect Side (Right) - Shifted by Offset
+    // Assuming Positive Offset H = Shift Up (Flat Bottom scenario implies offset)
+    // In drafting, usually "Offset" means distance between centerlines.
+    // Let's implement: Rect Center = cy - V_OFFSET
+    const cyRect = cy - V_OFFSET;
+    const yRectTop = cyRect - S/2;
+    const yRectBot = cyRect + S/2;
     
     const contour = `
         M${xLeft},${yRoundTop} L${xT1},${yRoundTop} L${xT2},${yRectTop} L${xRight},${yRectTop}
@@ -36,14 +57,20 @@ export const generateTransformation = (params: DuctParams, activeField: string |
         M${xLeft},${yRoundTop} L${xLeft},${yRoundBot}
         M${xRight},${yRectTop} L${xRight},${yRectBot}
     `;
-    const center = `<line x1="${xLeft}" y1="${cy}" x2="${xRight}" y2="${cy}" class="center-line" />`;
+    
     const crease = `
         <line x1="${xT1}" y1="${cy}" x2="${xT2}" y2="${yRectTop}" stroke="black" stroke-width="1" />
         <line x1="${xT1}" y1="${cy}" x2="${xT2}" y2="${yRectBot}" stroke="black" stroke-width="1" />
     `;
+    
+    // Center Lines
+    const centerRound = `<line x1="${xLeft}" y1="${cy}" x2="${xT1 + 20}" y2="${cy}" class="center-line" />`;
+    const centerRect = `<line x1="${xT2 - 20}" y1="${cyRect}" x2="${xRight}" y2="${cyRect}" class="center-line" />`;
+    const centerConnect = `<line x1="${xT1}" y1="${cy}" x2="${xT2}" y2="${cyRect}" class="phantom-line" />`;
+
     const path = `<path d="${contour}" class="line" />`;
     const f1 = drawFlange(xLeft, cy, D, true);
-    const f2 = drawFlange(xRight, cy, S, true);
+    const f2 = drawFlange(xRight, cyRect, S, true);
 
     const dimD = drawDim(xLeft, yRoundTop, xLeft, yRoundBot, `Ø${params.d1 || 500}`, 'left', null, 'd1', activeField);
     
@@ -51,8 +78,21 @@ export const generateTransformation = (params: DuctParams, activeField: string |
     const rectDimId = (activeField === 'width' || activeField === 'height') ? activeField : 'rect';
     const dimS = drawDim(xRight, yRectTop, xRight, yRectBot, `${params.width || 500}x${params.height || 500}`, 'right', null, rectDimId, activeField);
     
-    const dimL = drawDim(xLeft, yRectBot, xRight, yRectBot, `L=${params.length || 300}`, 'bottom', null, 'length', activeField);
+    // Length Dimension - Bottom
+    const yDimBot = Math.max(yRoundBot, yRectBot);
+    const dimL = drawDim(xLeft, yDimBot, xRight, yDimBot, `L=${params.length || 300}`, 'bottom', 40, 'length', activeField);
     
+    // Offset H Dimension (Right Side, between centerlines)
+    let dimH = "";
+    if (Math.abs(V_OFFSET) > 10) {
+        // Draw dimension further out right
+        const xDimH = xRight + 140; // Increased from 80 to avoid overlap with Rect dim (offset ~65)
+        dimH = drawDim(xDimH, cy, xDimH, cyRect, `H=${realH}`, 'right', 0, 'offset', activeField);
+        // Extension lines for H
+        dimH += `<line x1="${xLeft}" y1="${cy}" x2="${xDimH}" y2="${cy}" class="center-line" stroke-opacity="0.5" />`; // Extend Round Center
+        dimH += `<line x1="${xRight}" y1="${cyRect}" x2="${xDimH}" y2="${cyRect}" class="center-line" stroke-opacity="0.5" />`; // Extend Rect Center
+    }
+
     // Remarks
     let remark1 = "";
     if (params.flangeRemark1) {
@@ -62,9 +102,9 @@ export const generateTransformation = (params: DuctParams, activeField: string |
     
     let remark2 = "";
     if (params.flangeRemark2) {
-        // Point to top of right flange (Rect), Text Above Line
-        remark2 = drawAnnotation(xRight, yRectTop, params.flangeRemark2, true, true, 80, false).svg;
+        // Point to bottom of right flange (Rect), Leader goes down to avoid top clipping
+        remark2 = drawAnnotation(xRight, yRectBot, params.flangeRemark2, false, true, 80, false).svg;
     }
 
-    return createSvg(path + center + crease + f1 + f2 + dimD + dimS + dimL + remark1 + remark2, VIEW_WIDTH, VIEW_HEIGHT);
+    return createSvg(path + centerRound + centerRect + centerConnect + crease + f1 + f2 + dimD + dimS + dimL + dimH + remark1 + remark2, VIEW_WIDTH, VIEW_HEIGHT);
 };
