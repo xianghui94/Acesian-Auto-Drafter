@@ -5,6 +5,7 @@ export enum ComponentType {
   STRAIGHT = "Straight (直管)",
   TEE = "Tee (三通)",
   LATERAL_TEE = "Lateral Tee (45° 斜三通)",
+  BOOT_TEE = "Boot Tee (靴形三通)",
   TRANSFORMATION = "Transformation (Square to Round)",
   VOLUME_DAMPER = "Volume Control Damper (风阀)",
   MULTIBLADE_DAMPER = "Multiblade Damper (多叶风阀)",

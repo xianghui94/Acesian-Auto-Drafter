@@ -27,6 +27,9 @@ const getDefaultParams = (type: ComponentType): DuctParams => {
           const gap = d2 * 1.4142;
           return { d1: 500, d2: d2, length: Math.round(gap + 200), a_len: 100, b_len: 100, branch_len: Math.round(gap + 200) }; 
       }
+      // Boot Tee: L = a + 100 + d2 + b. Default a=100, b=100, d2=300 => L=600. 
+      // Collar Height (Total) = 100 (Transition) + 75 (Straight) = 175.
+      case ComponentType.BOOT_TEE: return { d1: 500, d2: 300, length: 600, a_len: 100, b_len: 100, branch_len: 175 };
       case ComponentType.TRANSFORMATION: return { d1: 500, width: 500, height: 500, length: 300, offset: 0 };
       case ComponentType.VOLUME_DAMPER: return { d1: 200, length: 150, actuation: "Handle" };
       case ComponentType.MULTIBLADE_DAMPER: return { d1: 700, length: 400, bladeType: "Parallel" };
@@ -242,6 +245,41 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
          }
     }
 
+    // Boot Tee Logic
+    if (componentType === ComponentType.BOOT_TEE) {
+        const d2 = key === 'd2' ? Number(val) : Number(newParams.d2 || 300);
+        const a = key === 'a_len' ? Number(val) : Number(newParams.a_len || 100);
+        const b = key === 'b_len' ? Number(val) : Number(newParams.b_len || 100);
+        const SLOPE_W = 100; // Fixed
+
+        // Auto-calc Length: L = a + slope + d2 + b
+        if (key === 'd2' || key === 'a_len' || key === 'b_len') {
+            if (shouldAutoCalc('length')) {
+                 newParams.length = a + SLOPE_W + d2 + b;
+            }
+        }
+        else if (key === 'length') {
+            // If user changes L, adjust b
+            // b = L - a - slope - d2
+            if (shouldAutoCalc('b_len')) {
+                const newB = Math.max(0, Number(val) - a - SLOPE_W - d2);
+                newParams.b_len = newB;
+            }
+        }
+
+        // Auto-calc Thickness based on D1
+        if (key === 'd1') {
+            const d = Number(val);
+            let t = "0.9";
+            if (d < 800) t = "0.9";
+            else if (d <= 900) t = "1.0";
+            else if (d <= 1200) t = "1.2";
+            else if (d <= 1500) t = "1.5";
+            else if (d > 1500) t = "2.0";
+            setMeta(prev => ({...prev, thickness: t}));
+        }
+    }
+
     // Flange Standard Auto-Calc for Blind Plate and Angle Flange
     if ((componentType === ComponentType.BLIND_PLATE || componentType === ComponentType.ANGLE_FLANGE) && key === 'd1') {
         const d = Number(val);
@@ -330,6 +368,8 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         description = `Tee Ø${params.main_d} / Ø${params.tap_d}`;
     } else if (componentType === ComponentType.LATERAL_TEE) {
         description = `Lateral Tee (45°) Ø${params.d1} / Ø${params.d2}`;
+    } else if (componentType === ComponentType.BOOT_TEE) {
+        description = `Boot Tee Ø${params.d1} / Ø${params.d2}`;
     } else if (componentType === ComponentType.OFFSET) {
         if (params.d1 !== params.d2) {
              description = `Reducing Offset Ø${params.d1}-Ø${params.d2} / L=${params.length} / H=${params.offset}`;
@@ -365,6 +405,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
       case ComponentType.STRAIGHT: return <Inputs.StraightInputs {...inputProps} />;
       case ComponentType.TEE: return <Inputs.TeeInputs {...inputProps} />;
       case ComponentType.LATERAL_TEE: return <Inputs.LateralTeeInputs {...inputProps} />;
+      case ComponentType.BOOT_TEE: return <Inputs.BootTeeInputs {...inputProps} />;
       case ComponentType.TRANSFORMATION: return <Inputs.TransformationInputs {...inputProps} />;
       case ComponentType.VOLUME_DAMPER: return <Inputs.VolumeDamperInputs {...inputProps} />;
       case ComponentType.MULTIBLADE_DAMPER: return <Inputs.MultibladeDamperInputs {...inputProps} />;

@@ -6,6 +6,7 @@ import {
     generateStraight, 
     generateTee, 
     generateLateralTee,
+    generateBootTee,
     generateTransformation, 
     generateVolumeDamper, 
     generateMultibladeDamper, 
@@ -30,6 +31,7 @@ export const generateDuctDrawing = (type: ComponentType, params: DuctParams, act
         case ComponentType.STRAIGHT: return generateStraight(params, activeField);
         case ComponentType.TEE: return generateTee(params, activeField);
         case ComponentType.LATERAL_TEE: return generateLateralTee(params, activeField);
+        case ComponentType.BOOT_TEE: return generateBootTee(params, activeField);
         case ComponentType.TRANSFORMATION: return generateTransformation(params, activeField);
         case ComponentType.VOLUME_DAMPER: return generateVolumeDamper(params, activeField);
         case ComponentType.MULTIBLADE_DAMPER: return generateMultibladeDamper(params, activeField);

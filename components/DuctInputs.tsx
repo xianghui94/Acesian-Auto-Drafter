@@ -119,6 +119,26 @@ export const LateralTeeInputs: React.FC<InputProps> = ({ params, onChange, onFoc
     </>
 );
 
+export const BootTeeInputs: React.FC<InputProps> = ({ params, onChange, onFocus, onBlur }) => (
+    <>
+        <NumInput label="Main Ø (D1)" fieldId="d1" value={params.d1} onChange={v => onChange('d1', v)} onFocus={onFocus} onBlur={onBlur} />
+        <NumInput label="Branch Ø (D2)" fieldId="d2" value={params.d2} onChange={v => onChange('d2', v)} onFocus={onFocus} onBlur={onBlur} />
+        <NumInput label="Length L" fieldId="length" value={params.length} onChange={v => onChange('length', v)} onFocus={onFocus} onBlur={onBlur} />
+
+        <div className="grid grid-cols-3 gap-2 col-span-2">
+            <NumInput label="Ext a" fieldId="a_len" value={params.a_len || 100} onChange={v => onChange('a_len', v)} onFocus={onFocus} onBlur={onBlur} />
+            <NumInput label="Ext b" fieldId="b_len" value={params.b_len || 100} onChange={v => onChange('b_len', v)} onFocus={onFocus} onBlur={onBlur} />
+            <NumInput label="Collar H" fieldId="branch_len" value={params.branch_len || 75} onChange={v => onChange('branch_len', v)} onFocus={onFocus} onBlur={onBlur} />
+        </div>
+
+        {/* Flange Remarks */}
+        <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
+            <TextAreaInput label="Main Flange Remark" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} onFocus={onFocus} onBlur={onBlur} />
+            <TextAreaInput label="Branch Flange Remark" value={params.flangeRemark2 || ""} onChange={v => onChange('flangeRemark2', v)} onFocus={onFocus} onBlur={onBlur} />
+        </div>
+    </>
+);
+
 export const TransformationInputs: React.FC<InputProps> = ({ params, onChange, onFocus, onBlur }) => (
     <>
         <NumInput label="Diameter Ø" fieldId="d1" value={params.d1} onChange={v => onChange('d1', v)} onFocus={onFocus} onBlur={onBlur} />

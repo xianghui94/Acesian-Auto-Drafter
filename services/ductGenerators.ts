@@ -4,6 +4,7 @@ export * from './generators/reducer';
 export * from './generators/elbow';
 export * from './generators/tee';
 export * from './generators/lateralTee';
+export * from './generators/bootTee';
 export * from './generators/transformation';
 export * from './generators/volumeDamper';
 export * from './generators/multibladeDamper';
