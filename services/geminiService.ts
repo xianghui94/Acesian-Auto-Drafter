@@ -11,7 +11,8 @@ import {
     generateBlindPlate,
     generateBlastGateDamper,
     generateAngleFlange,
-    generateOffset
+    generateOffset,
+    generateSaddle
 } from "./ductGenerators";
 
 /**
@@ -34,6 +35,8 @@ export const generateDuctDrawing = (type: ComponentType, params: DuctParams, act
         case ComponentType.BLAST_GATE_DAMPER: return generateBlastGateDamper(params, activeField);
         case ComponentType.ANGLE_FLANGE: return generateAngleFlange(params, activeField);
         case ComponentType.OFFSET: return generateOffset(params, activeField);
+        case ComponentType.SADDLE: return generateSaddle(params, activeField);
+        case ComponentType.MANUAL: return "";
         default: return "";
     }
 };

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { OrderHeader, OrderItem } from '../types';
 
@@ -184,32 +185,36 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
                  >
                      {item ? (
                         <>
-                           {/* Row 1: Attributes - Box Style - Rebalanced Widths */}
+                           {/* Row 1: Description | Material */}
                            <div className="flex border-b border-black text-[10px] leading-tight h-[5mm]">
-                               <div className="w-[18%] border-r border-black pl-1 flex items-center bg-gray-50">
-                                 <span className="font-bold mr-1">Item:</span>{absoluteIndex + 1}
+                               <div className="w-[70%] border-r border-black pl-1 flex items-center overflow-hidden">
+                                 <span className="font-bold mr-1">Desc:</span><span className="truncate font-medium">{item.description}</span>
                                </div>
-                               <div className="w-[12%] border-r border-black pl-1 flex items-center">
-                                 <span className="font-bold mr-1">Qty:</span>{item.qty}
-                               </div>
-                               <div className="w-[15%] border-r border-black pl-1 flex items-center">
-                                 <span className="font-bold mr-1">Thk:</span>{item.thickness}
-                               </div>
-                               <div className="w-[30%] border-r border-black pl-1 flex items-center overflow-hidden">
-                                 <span className="font-bold mr-1">Mat:</span><span className="truncate">{item.material}</span>
-                               </div>
-                               <div className="flex-1 pl-1 flex items-center">
-                                 <span className="font-bold mr-1">Coat:</span>{item.coating}
+                               <div className="w-[30%] pl-1 flex items-center overflow-hidden">
+                                 <span className="font-bold mr-1">Material:</span><span className="truncate">{item.material}</span>
                                </div>
                            </div>
                            
-                           {/* Row 2: Tag & Desc - Box Style */}
+                           {/* Row 2: Item No | Thk | Qty | Coating */}
                            <div className="flex border-b border-black text-[10px] leading-tight h-[5mm]">
-                               <div className="w-[30%] border-r border-black pl-1 flex items-center overflow-hidden">
-                                 <span className="font-bold mr-1">Tag:</span><span className="truncate">{item.tagNo}</span>
+                               <div className="w-[20%] border-r border-black pl-1 flex items-center bg-gray-50">
+                                 <span className="font-bold mr-1">Item No:</span>{absoluteIndex + 1}
                                </div>
-                               <div className="flex-1 pl-1 flex items-center overflow-hidden">
-                                 <span className="font-bold mr-1">Desc:</span><span className="truncate font-medium">{item.description}</span>
+                               <div className="w-[20%] border-r border-black pl-1 flex items-center">
+                                 <span className="font-bold mr-1">Thk:</span>{item.thickness}
+                               </div>
+                               <div className="w-[20%] border-r border-black pl-1 flex items-center">
+                                 <span className="font-bold mr-1">Qty:</span>{item.qty}
+                               </div>
+                               <div className="flex-1 pl-1 flex items-center">
+                                 <span className="font-bold mr-1">Coating:</span>{item.coating}
+                               </div>
+                           </div>
+
+                           {/* Row 3: Tag No */}
+                           <div className="flex border-b border-black text-[10px] leading-tight h-[5mm]">
+                               <div className="w-full pl-1 flex items-center overflow-hidden">
+                                 <span className="font-bold mr-1">Tag No:</span><span className="truncate">{item.tagNo}</span>
                                </div>
                            </div>
 
@@ -290,17 +295,31 @@ const SinglePage = ({ header, items, pageIndex, totalPages, startIndex, onRemove
   );
 };
 
-const HeaderRow = ({ label1, val1, label2, val2, label3, val3, className, val2Class }: any) => (
-    <div className={`flex border-b border-black last:border-0 items-center text-[9px] ${className || 'h-[6mm]'}`}>
-        <div className="w-[24mm] p-1 border-r border-black font-bold truncate bg-gray-50 h-full flex items-center">{label1}:</div>
-        <div className="flex-1 p-1 border-r border-black truncate h-full flex items-center">{val1}</div>
-        <div className="w-[32mm] p-1 border-r border-black font-bold truncate bg-gray-50 h-full flex items-center">{label2}:</div>
-        <div className={`flex-1 p-1 border-r border-black h-full flex items-center overflow-hidden ${val2Class || 'truncate'}`}>{val2}</div>
-        {label3 && (
-            <>
-                <div className="w-[26mm] p-1 border-r border-black font-bold truncate bg-gray-50 h-full flex items-center">{label3}</div>
-                <div className="w-[18mm] p-1 truncate h-full flex items-center">{val3}</div>
-            </>
-        )}
-    </div>
-);
+const HeaderRow = ({ label1, val1, label2, val2, label3, val3, className, val2Class }: any) => {
+    // Standard Grid: [25mm | 55mm | 25mm | Flex ] OR [25mm | 55mm | 25mm | 30mm | 30mm | 25mm]
+    return (
+        <div className={`flex border-b border-black last:border-0 items-center text-[9px] ${className || 'h-[6mm]'}`}>
+            {/* Col 1 */}
+            <div className="w-[25mm] p-1 border-r border-black font-bold truncate bg-gray-50 h-full flex items-center">{label1}:</div>
+            {/* Col 2 */}
+            <div className="w-[55mm] p-1 border-r border-black truncate h-full flex items-center">{val1}</div>
+            
+            {/* Col 3 */}
+            <div className="w-[25mm] p-1 border-r border-black font-bold truncate bg-gray-50 h-full flex items-center">{label2}:</div>
+            
+            {label3 ? (
+                <>
+                    {/* Col 4 (Short) */}
+                    <div className="w-[30mm] p-1 border-r border-black truncate h-full flex items-center">{val2}</div>
+                    {/* Col 5 */}
+                    <div className="w-[30mm] p-1 border-r border-black font-bold truncate bg-gray-50 h-full flex items-center">{label3}:</div>
+                    {/* Col 6 */}
+                    <div className="w-[25mm] p-1 truncate h-full flex items-center">{val3}</div>
+                </>
+            ) : (
+                /* Col 4 (Long) */
+                <div className={`flex-1 p-1 border-r border-black h-full flex items-center overflow-hidden ${val2Class || 'truncate'}`}>{val2}</div>
+            )}
+        </div>
+    );
+};

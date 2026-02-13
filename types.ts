@@ -11,7 +11,9 @@ export enum ComponentType {
   BLIND_PLATE = "Blind Plate (盲板)",
   BLAST_GATE_DAMPER = "Blast Gate Damper (插板阀)",
   ANGLE_FLANGE = "Angle Flange (角铁法兰)",
-  OFFSET = "Offset (S-Bend)"
+  OFFSET = "Offset (S-Bend)",
+  SADDLE = "Saddle Tap (马鞍接口)",
+  MANUAL = "Manual Input (Blank Item)"
 }
 
 export type DuctParams = {

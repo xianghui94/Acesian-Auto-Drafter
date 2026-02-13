@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ItemBuilder } from './components/ItemBuilder';
@@ -41,6 +42,10 @@ export default function App() {
 
   const handleHeaderChange = (field: keyof OrderHeader, value: string) => {
     setHeader(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const handleBulkHeaderChange = (updates: Partial<OrderHeader>) => {
+    setHeader(prev => ({ ...prev, ...updates }));
   };
 
   // Central Save Handler (Add / Update / Insert)
@@ -146,7 +151,11 @@ export default function App() {
     <div className="flex h-screen w-screen overflow-hidden bg-cad-50 font-sans text-cad-900 selection:bg-blue-100 print:h-auto print:w-auto print:overflow-visible print:block">
       
       {/* Left: Global Settings */}
-      <Sidebar header={header} onChange={handleHeaderChange} />
+      <Sidebar 
+          header={header} 
+          onChange={handleHeaderChange}
+          onBulkChange={handleBulkHeaderChange} 
+      />
       
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full relative overflow-hidden print:h-auto print:overflow-visible print:block">

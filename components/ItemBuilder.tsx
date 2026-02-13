@@ -3,6 +3,7 @@ import { ComponentType, DuctParams, OrderItem } from '../types';
 import { generateDuctDrawing } from '../services/geminiService';
 import * as Inputs from './DuctInputs';
 import { NumInput, TextInput } from './InputFields';
+import { getFlangeParams } from '../services/flangeStandards';
 
 interface ItemBuilderProps {
   onSave: (item: any) => void;
@@ -15,17 +16,25 @@ interface ItemBuilderProps {
 const getDefaultParams = (type: ComponentType): DuctParams => {
     switch (type) {
       case ComponentType.ELBOW: return { d1: 500, angle: 90, radius: 250, extension1: 0, extension2: 0 };
-      case ComponentType.REDUCER: return { d1: 500, d2: 300, length: 500, extension1: 50, extension2: 50, reducerType: "Concentric" };
-      case ComponentType.STRAIGHT: return { d1: 300, length: 1000 };
+      case ComponentType.REDUCER: return { d1: 500, d2: 300, length: 300, extension1: 50, extension2: 50, reducerType: "Concentric" };
+      case ComponentType.STRAIGHT: return { d1: 300, length: 1200 };
       case ComponentType.TEE: return { main_d: 500, tap_d: 300, length: 500, branch_l: 100 };
       case ComponentType.TRANSFORMATION: return { d1: 500, width: 500, height: 500, length: 300 };
       case ComponentType.VOLUME_DAMPER: return { d1: 200, length: 150, actuation: "Handle" };
       case ComponentType.MULTIBLADE_DAMPER: return { d1: 700, length: 400, bladeType: "Parallel" };
       case ComponentType.STRAIGHT_WITH_TAPS: return { d1: 500, length: 1200, tapQty: 1, nptQty: 0, seamAngle: 0, taps: [{ dist: 600, diameter: 150, angle: 0 }], nptPorts: [] };
-      case ComponentType.BLIND_PLATE: return { d1: 200 };
+      case ComponentType.BLIND_PLATE: {
+          const f = getFlangeParams(200);
+          return { d1: 200, pcd: f.bcd, holeCount: f.holeCount };
+      }
       case ComponentType.BLAST_GATE_DAMPER: return { d1: 200, length: 200 };
-      case ComponentType.ANGLE_FLANGE: return { d1: 800 };
+      case ComponentType.ANGLE_FLANGE: {
+          const f = getFlangeParams(800);
+          return { d1: 800, pcd: f.bcd, holeCount: f.holeCount };
+      }
       case ComponentType.OFFSET: return { d1: 500, length: 800, offset: 200 };
+      case ComponentType.SADDLE: return { d1: 1000, d2: 450, length: 100 };
+      case ComponentType.MANUAL: return { userDescription: "" };
       default: return {};
     }
 };
@@ -132,6 +141,8 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         setMeta(prev => ({ ...prev, coating: "No" }));
     } else if (componentType === ComponentType.OFFSET) {
         setMeta(prev => ({ ...prev, thickness: "0.9" }));
+    } else if (componentType === ComponentType.SADDLE) {
+        setMeta(prev => ({ ...prev, coating: "ETFE Coated", material: "SS304" }));
     } else {
         setMeta(prev => (prev.thickness === "3.0" ? { ...prev, thickness: "0.8" } : prev));
     }
@@ -176,6 +187,14 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         if (shouldAutoCalc('length')) {
             newParams.length = Number(val) + 200;
         }
+    }
+
+    // Flange Standard Auto-Calc for Blind Plate and Angle Flange
+    if ((componentType === ComponentType.BLIND_PLATE || componentType === ComponentType.ANGLE_FLANGE) && key === 'd1') {
+        const d = Number(val);
+        const std = getFlangeParams(d);
+        if (shouldAutoCalc('pcd')) newParams.pcd = std.bcd;
+        if (shouldAutoCalc('holeCount')) newParams.holeCount = std.holeCount;
     }
     
     setParams(newParams);
@@ -226,27 +245,40 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
 
   const handleSave = async () => {
     let description = componentType.split(' ')[0]; 
-    if (componentType === ComponentType.STRAIGHT) description = "Straight Duct";
-    else if (componentType === ComponentType.TRANSFORMATION) description = "Transformation Sq-Rd";
-    else if (componentType === ComponentType.VOLUME_DAMPER) description = `VCD (${params.actuation})`;
-    else if (componentType === ComponentType.MULTIBLADE_DAMPER) description = `${params.bladeType} Multiblade Damper`;
-    else if (componentType === ComponentType.STRAIGHT_WITH_TAPS) {
+    if (componentType === ComponentType.MANUAL) {
+        description = params.userDescription || "Manual Item";
+    } else if (componentType === ComponentType.STRAIGHT) {
+        description = "Straight Duct";
+    } else if (componentType === ComponentType.TRANSFORMATION) {
+        description = "Transformation Sq-Rd";
+    } else if (componentType === ComponentType.VOLUME_DAMPER) {
+        description = `VCD (${params.actuation})`;
+    } else if (componentType === ComponentType.MULTIBLADE_DAMPER) {
+        description = `${params.bladeType} Multiblade Damper`;
+    } else if (componentType === ComponentType.STRAIGHT_WITH_TAPS) {
         let desc = "Straight";
         if (params.tapQty > 0) desc += ` w/ ${params.tapQty} Taps`;
         if (params.nptQty > 0) desc += ` & ${params.nptQty} NPT`;
         description = desc;
-    } else if (componentType === ComponentType.BLIND_PLATE) description = `Blind Plate Ø${params.d1}`;
-    else if (componentType === ComponentType.BLAST_GATE_DAMPER) description = `Blast Gate Damper Ø${params.d1}`;
-    else if (componentType === ComponentType.ANGLE_FLANGE) description = `Angle Flange Ø${params.d1}`;
-    else if (componentType === ComponentType.TEE) description = `Tee Ø${params.main_d} / Ø${params.tap_d}`;
-    else if (componentType === ComponentType.OFFSET) description = `Offset Ø${params.d1} / L=${params.length} / H=${params.offset}`;
-    else if (componentType === ComponentType.ELBOW) {
+    } else if (componentType === ComponentType.BLIND_PLATE) {
+        description = `Blind Plate Ø${params.d1}`;
+    } else if (componentType === ComponentType.BLAST_GATE_DAMPER) {
+        description = `Blast Gate Damper Ø${params.d1}`;
+    } else if (componentType === ComponentType.ANGLE_FLANGE) {
+        description = `Angle Flange Ø${params.d1}`;
+    } else if (componentType === ComponentType.TEE) {
+        description = `Tee Ø${params.main_d} / Ø${params.tap_d}`;
+    } else if (componentType === ComponentType.OFFSET) {
+        description = `Offset Ø${params.d1} / L=${params.length} / H=${params.offset}`;
+    } else if (componentType === ComponentType.ELBOW) {
         description = `Elbow Ø${params.d1} / ${params.angle}° / R${params.radius}`;
         if (params.extension1 > 0 || params.extension2 > 0) description += ` / Ext:${params.extension1 || 0}+${params.extension2 || 0}`;
     } else if (componentType === ComponentType.REDUCER) {
         const typeStr = params.reducerType === "Eccentric" ? "Eccentric Reducer" : "Reducer";
         description = `${typeStr} Ø${params.d1} / Ø${params.d2} / L${params.length}`;
         if (params.extension1 !== 50 || params.extension2 !== 50) description += ` / RC:${params.extension1}-${params.extension2}`;
+    } else if (componentType === ComponentType.SADDLE) {
+        description = `Saddle Tap Ø${params.d1} on Ø${params.d2} / L${params.length}`;
     }
 
     onSave({ componentType, params, ...meta, description, sketchSvg: previewSvg });
@@ -274,6 +306,8 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
       case ComponentType.BLAST_GATE_DAMPER: return <Inputs.BlastGateDamperInputs {...inputProps} />;
       case ComponentType.ANGLE_FLANGE: return <Inputs.AngleFlangeInputs {...inputProps} />;
       case ComponentType.OFFSET: return <Inputs.OffsetInputs {...inputProps} />;
+      case ComponentType.SADDLE: return <Inputs.SaddleInputs {...inputProps} />;
+      case ComponentType.MANUAL: return <Inputs.ManualInputs {...inputProps} />;
     }
   };
 
@@ -327,7 +361,11 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
                                     className={`flex flex-col items-center p-2 rounded border hover:bg-blue-50 hover:border-blue-300 transition-all ${componentType === item.type ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'border-cad-100'}`}
                                 >
                                     <div className="w-full h-20 bg-white mb-2 overflow-hidden flex items-center justify-center p-1 border border-cad-100 rounded">
-                                        <div dangerouslySetInnerHTML={{__html: item.svg}} className="w-full h-full" />
+                                        {item.type === ComponentType.MANUAL ? (
+                                            <div className="text-[10px] text-cad-400 italic text-center px-1">Blank / Custom</div>
+                                        ) : (
+                                            <div dangerouslySetInnerHTML={{__html: item.svg}} className="w-full h-full" />
+                                        )}
                                     </div>
                                     <span className="text-[10px] font-bold text-center leading-tight text-cad-700">
                                         {item.type.split('(')[0]}
@@ -379,6 +417,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
                                     <option value="Yes">Yes</option>
                                     <option value="No">No</option>
                                     <option value="N/A">N/A</option>
+                                    <option value="ETFE Coated">ETFE Coated</option>
                                 </select>
                             </div>
 
@@ -431,7 +470,13 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
                     </div>
                     
                     <div className="flex-1 bg-white border border-cad-200 rounded-lg shadow-inner overflow-hidden flex items-center justify-center p-2 min-h-[300px]">
-                        {previewSvg ? (
+                        {componentType === ComponentType.MANUAL ? (
+                            <div className="text-cad-300 text-sm italic text-center px-8">
+                                <span className="text-2xl block mb-2">📝</span>
+                                Manual Mode Active<br/>
+                                No sketch will be generated
+                            </div>
+                        ) : previewSvg ? (
                             <div 
                                 className="w-full h-full flex items-center justify-center"
                                 dangerouslySetInnerHTML={{ __html: previewSvg }}

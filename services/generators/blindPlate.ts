@@ -1,46 +1,49 @@
 import { DuctParams } from "../../types";
-import { createSvg, drawDim, VIEW_BOX_SIZE } from "../svgUtils";
-
-const BLIND_PLATE_LOOKUP: Record<number, number> = {
-    100: 156, 150: 206, 200: 260, 250: 310, 300: 368, 350: 417,
-    400: 467, 450: 517, 500: 578, 550: 628, 600: 678, 650: 728,
-    700: 778, 750: 828, 800: 878, 850: 928, 900: 978, 950: 1028,
-    1000: 1079, 1100: 1178, 1200: 1278, 1300: 1378, 1400: 1478,
-    1500: 1578, 1600: 1703, 1700: 1803, 1800: 1903, 1900: 2003,
-    2000: 2102
-};
+import { createSvg, drawDim, drawAnnotation, VIEW_BOX_SIZE } from "../svgUtils";
+import { getFlangeParams } from "../flangeStandards";
 
 export const generateBlindPlate = (params: DuctParams, activeField: string | null = null) => {
     const VIEW_WIDTH = VIEW_BOX_SIZE;
-    const VIEW_HEIGHT = 600; // Reduced from 800
+    const VIEW_HEIGHT = 500; // Reduced to trim whitespace
     const cx = VIEW_WIDTH / 2;
     const cy = VIEW_HEIGHT / 2;
     
     const dNominal = params.d1 || 200;
     
-    // Lookup OD from table, or default to dNominal + 50 if not found
-    const realOD = BLIND_PLATE_LOOKUP[dNominal] || (dNominal + 50);
+    // Get Standard Params for comparison
+    const std = getFlangeParams(dNominal);
     
-    // Fixed visual radius for Outer Diameter
-    const V_R = 190; 
+    // Use params if present, else standard
+    const realPCD = params.pcd !== undefined ? params.pcd : std.bcd;
+    const numBolts = params.holeCount !== undefined ? params.holeCount : std.holeCount;
+
+    // Detect Manual Override
+    const isManual = (params.pcd !== undefined && params.pcd !== std.bcd) || 
+                     (params.holeCount !== undefined && params.holeCount !== std.holeCount);
+
     
-    // Calculate Visual Inner Diameter based on ratio
-    let ratio = dNominal / realOD;
-    if (ratio > 0.95) ratio = 0.95; 
+    // Scale Logic: Maximize view usage based on standard flange proportions
+    const theoreticalOD = realPCD + 40;
+    // Reduce target size to allow room for dimensions within smaller height
+    const targetSize = 350; 
+    const scale = targetSize / theoreticalOD;
     
-    const V_R_ID = V_R * ratio;
-    const V_R_PCD = (V_R + V_R_ID) / 2;
+    const V_R_PCD = (realPCD / 2) * scale;
+    const V_R_ID = (dNominal / 2) * scale;
+    const V_R_OD = V_R_PCD + 20; 
     
-    const circle = `<circle cx="${cx}" cy="${cy}" r="${V_R}" class="line" />`;
-    const idCircle = `<circle cx="${cx}" cy="${cy}" r="${V_R_ID}" class="phantom-line" />`;
-    const pcd = `<circle cx="${cx}" cy="${cy}" r="${V_R_PCD}" class="phantom-line" />`;
-    const centerLong = `<line x1="${cx-V_R-20}" y1="${cy}" x2="${cx+V_R+20}" y2="${cy}" class="phantom-line" /><line x1="${cx}" y1="${cy-V_R-20}" x2="${cx}" y2="${cy+V_R+20}" class="phantom-line" />`;
+    const circle = `<circle cx="${cx}" cy="${cy}" r="${V_R_OD}" class="line" />`;
+    // ID circle as phantom to show nominal size
+    const idCircle = `<circle cx="${cx}" cy="${cy}" r="${V_R_ID}" class="phantom-line" stroke-dasharray="5,5" />`; 
+    
+    const pcdCircle = `<circle cx="${cx}" cy="${cy}" r="${V_R_PCD}" class="phantom-line" />`;
+    const centerLong = `<line x1="${cx-V_R_OD-20}" y1="${cy}" x2="${cx+V_R_OD+20}" y2="${cy}" class="phantom-line" /><line x1="${cx}" y1="${cy-V_R_OD-20}" x2="${cx}" y2="${cy+V_R_OD+20}" class="phantom-line" />`;
 
     // Reinforcement Angle Bars & Labels
     let bars = "";
     let barLabel = "";
     const R_BARS = V_R_PCD - 10; 
-    const barStyle = 'stroke="#15803d" stroke-width="4" stroke-linecap="round" fill="none"'; // Green color from sketch, thick
+    const barStyle = 'stroke="#15803d" stroke-width="4" stroke-linecap="round" fill="none"'; // Green color
     
     let labelText = "";
     let showLabel = false;
@@ -75,30 +78,39 @@ export const generateBlindPlate = (params: DuctParams, activeField: string | nul
     }
 
     if (showLabel) {
-        // Draw label at bottom
-        const labelY = cy + V_R + 45;
-        // Leader line pointing to the angle bar (approx center)
-        const leaderPath = `M${cx},${cy+10} L${cx+20},${labelY-15} L${cx+50},${labelY-15}`;
+        // Draw label at bottom center
+        const labelY = cy + V_R_OD + 50;
+        const textTop = labelY - 25;
+        const rimBot = cy + V_R_OD + 10;
         
         barLabel = `
-            <path d="${leaderPath}" fill="none" stroke="black" stroke-width="1" />
-            <text x="${cx+55}" y="${labelY-10}" font-family="sans-serif" font-size="14" font-weight="bold" fill="black">${labelText}</text>
+            <line x1="${cx}" y1="${textTop}" x2="${cx}" y2="${rimBot}" stroke="black" stroke-width="1" />
+            <text x="${cx}" y="${labelY}" font-family="sans-serif" font-size="28" font-weight="bold" fill="black" text-anchor="middle">${labelText}</text>
         `;
     }
 
-    // Bolt Holes
-    const numBolts = 12; 
+    // Bolt Holes & Manual Override Annotation
     let holes = "";
-    const holeR = 4;
+    let annotation = "";
+    const holeR = 3.5;
+    const targetHoleIdx = Math.round(numBolts / 4); // Target hole at ~90deg (3 o'clock)
+    
     for(let i=0; i<numBolts; i++) {
+        // Start from -90 (Top)
         const rad = (i * (360/numBolts) - 90) * Math.PI / 180;
         const bx = cx + V_R_PCD * Math.cos(rad);
         const by = cy + V_R_PCD * Math.sin(rad);
         holes += `<circle cx="${bx}" cy="${by}" r="${holeR}" class="line" stroke-width="1.5" />`;
+        
+        // Point to the target hole (Right side) if manual override exists
+        if (isManual && i === targetHoleIdx) {
+            // Leader goes Down-Right to avoid Top Dimension collision
+            annotation = drawAnnotation(bx, by, `P.C.D: ${realPCD}\n${numBolts} HOLES`, false, true, 45, false).svg;
+        }
     }
 
-    // Top Dimension
-    const dimTop = drawDim(cx - V_R_ID, cy, cx + V_R_ID, cy, `Ø${dNominal}`, 'top', V_R + 30, 'd1', activeField);
+    // Dimensions
+    const dimTop = drawDim(cx - V_R_ID, cy, cx + V_R_ID, cy, `Ø${dNominal}`, 'top', V_R_OD + 25, 'd1', activeField);
 
-    return createSvg(circle + idCircle + pcd + centerLong + bars + barLabel + holes + dimTop, VIEW_WIDTH, VIEW_HEIGHT);
+    return createSvg(circle + idCircle + pcdCircle + centerLong + bars + barLabel + holes + dimTop + annotation, VIEW_WIDTH, VIEW_HEIGHT);
 };

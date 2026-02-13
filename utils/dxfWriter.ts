@@ -1,3 +1,4 @@
+
 import { OrderHeader, OrderItem } from '../types';
 
 // --- Constants (Units in mm) ---
@@ -188,15 +189,13 @@ const drawPageTemplate = (writer: DxfWriter, ox: number, oy: number, header: Ord
     // Draw horizontal lines for Info Table
     rowY.forEach(y => writer.addLine(ox + CONTENT_L, y, ox + CONTENT_R, y, "FRAME", colorFrame));
 
-    // Draw Vertical dividers for Info Table
-    // Pattern matches OrderSheet.tsx: Label(24) | Val(Flex) | Label(32) | Val(Flex) | Label(26) | Val(18)
-    const x1 = ox + CONTENT_L + 24;
-    const x2 = ox + CONTENT_L + (CONTENT_W/2); // Midpoint split
-    const x3 = x2 + 32;
-    // Optional 3rd column divider
-    const x4 = ox + CONTENT_R - 44; 
-
-    // Draw main verticals
+    // Draw Main Vertical dividers for Info Table based on Grid
+    // Col 1 (25mm) | Col 2 (55mm) | Col 3 (25mm) | ...
+    const x1 = ox + CONTENT_L + 25;
+    const x2 = x1 + 55;  // 80mm from left
+    const x3 = x2 + 25;  // 105mm from left
+    
+    // Draw main verticals covering all rows
     writer.addLine(x1, oy + Y_HEADER_START, x1, oy + Y_INFO_START, "FRAME", colorFrame);
     writer.addLine(x2, oy + Y_HEADER_START, x2, oy + Y_INFO_START, "FRAME", colorFrame);
     writer.addLine(x3, oy + Y_HEADER_START, x3, oy + Y_INFO_START, "FRAME", colorFrame);
@@ -205,27 +204,39 @@ const drawPageTemplate = (writer: DxfWriter, ox: number, oy: number, header: Ord
     const addField = (row: number, label1: string, val1: string, label2: string, val2: string, label3?: string, val3?: string) => {
         const y = rowY[row] - 4; // Vertical center approx
         const h = 2.5;
-        // Col 1
+        // Col 1 (L: 25mm)
         writer.addText(ox + CONTENT_L + 2, y, label1 + ":", h, "LABEL", colorText);
+        // Col 2 (V: 55mm)
         writer.addText(x1 + 2, y, val1, h, "TEXT", colorText);
-        // Col 2
+        // Col 3 (L: 25mm)
         writer.addText(x2 + 2, y, label2 + ":", h, "LABEL", colorText);
-        writer.addText(x3 + 2, y, val2, h, "TEXT", colorText);
-        // Col 3
+        
         if (label3 && val3) {
-            writer.addLine(x4, rowY[row+1], x4, rowY[row], "FRAME", colorFrame); // Add vertical line
-            writer.addText(x4 + 2, y, label3, h, "LABEL", colorText);
-            const x5 = x4 + 26; // Width of label 3
+            // 3-Column Layout: Col 4 (30mm), Col 5 (30mm), Col 6 (25mm)
+            const x4 = x3 + 30; // 135mm from left
+            const x5 = x4 + 30; // 165mm from left
+            
+            // Draw row-specific vertical dividers
+            writer.addLine(x4, rowY[row+1], x4, rowY[row], "FRAME", colorFrame);
             writer.addLine(x5, rowY[row+1], x5, rowY[row], "FRAME", colorFrame);
+            
+            // Col 4 (V: 30mm)
+            writer.addText(x3 + 2, y, val2, h, "TEXT", colorText);
+            // Col 5 (L: 30mm)
+            writer.addText(x4 + 2, y, label3 + ":", h, "LABEL", colorText);
+            // Col 6 (V: 25mm)
             writer.addText(x5 + 2, y, val3, h, "TEXT", colorText);
+        } else {
+            // 2-Column Layout: Col 4 extends to end (Remaining ~85mm)
+            writer.addText(x3 + 2, y, val2, h, "TEXT", colorText);
         }
     };
 
     addField(0, "Company", header.company, "O.S. No.", header.osNo, "AF Type", header.afType);
-    addField(1, "From", header.from, "P.O. No.", header.poNo, "Pressure", header.pressureRating);
+    addField(1, "From", header.from, "P.O. No.", header.poNo, "Pressure Rating", header.pressureRating);
     addField(2, "Project", header.project, "Prepared By", header.preparedBy);
-    addField(3, "Date", header.date, "PIC", header.personInCharge);
-    addField(4, "Lateral No", header.lateralNo, "Cust Ref", header.customerRef);
+    addField(3, "Date", header.date, "Person in Charge", header.personInCharge);
+    addField(4, "Lateral No", header.lateralNo, "Customer Ref", header.customerRef);
     
     // Last Row (Address - Taller)
     const yAddr = rowY[5] + 8;
@@ -262,13 +273,10 @@ const drawItem = (writer: DxfWriter, ox: number, oy: number, item: OrderItem, sl
     const cellY = oy + Y_ITEMS_START - (row * ROW_H); // Top Y of cell
     const cellW = COL_W;
     
-    // Internal Grid Lines for Item Attributes
-    // Row 1: Attributes (H=5mm) -> Y: cellY down to cellY-5
-    // Row 2: Tag/Desc (H=5mm) -> Y: cellY-5 down to cellY-10
-    // Row 3: Notes (H=5mm) -> Y: cellBottom up to cellBottom+5
-    
-    const yAttr = cellY - 5;
-    const yDesc = cellY - 10;
+    // Updated Grid Layout (3-Row Header)
+    const yRow1 = cellY - 5;
+    const yRow2 = cellY - 10;
+    const yRow3 = cellY - 15;
     const yNote = cellY - ROW_H + 5;
     const cellBot = cellY - ROW_H;
 
@@ -276,53 +284,51 @@ const drawItem = (writer: DxfWriter, ox: number, oy: number, item: OrderItem, sl
     const txtH = 2.0;
 
     // Horizontal Lines inside cell
-    writer.addLine(cellX, yAttr, cellX + cellW, yAttr, "FRAME", colorLine);
-    writer.addLine(cellX, yDesc, cellX + cellW, yDesc, "FRAME", colorLine);
+    writer.addLine(cellX, yRow1, cellX + cellW, yRow1, "FRAME", colorLine);
+    writer.addLine(cellX, yRow2, cellX + cellW, yRow2, "FRAME", colorLine);
+    writer.addLine(cellX, yRow3, cellX + cellW, yRow3, "FRAME", colorLine);
     writer.addLine(cellX, yNote, cellX + cellW, yNote, "FRAME", colorLine);
 
-    // Vertical Lines for Attributes
-    // Widths: Item(18%), Qty(12%), Thk(15%), Mat(30%), Coat(Rest)
-    const w1 = cellW * 0.18;
-    const w2 = cellW * 0.12;
-    const w3 = cellW * 0.15;
-    const w4 = cellW * 0.30;
-    
-    let cx = cellX + w1; writer.addLine(cx, cellY, cx, yAttr, "FRAME", colorLine);
-    cx += w2; writer.addLine(cx, cellY, cx, yAttr, "FRAME", colorLine);
-    cx += w3; writer.addLine(cx, cellY, cx, yAttr, "FRAME", colorLine);
-    cx += w4; writer.addLine(cx, cellY, cx, yAttr, "FRAME", colorLine);
+    // --- Vertical Separators ---
+    // Row 1: Desc (70%) | Mat (30%)
+    const wR1C1 = cellW * 0.70;
+    writer.addLine(cellX + wR1C1, cellY, cellX + wR1C1, yRow1, "FRAME", colorLine);
 
-    // Tag Vertical Line (30%)
-    const wTag = cellW * 0.30;
-    writer.addLine(cellX + wTag, yAttr, cellX + wTag, yDesc, "FRAME", colorLine);
+    // Row 2: Item (20%) | Thk (20%) | Qty (20%) | Coat (40%)
+    const wR2C1 = cellW * 0.20;
+    const wR2C2 = cellW * 0.20;
+    const wR2C3 = cellW * 0.20;
+    
+    let cx = cellX + wR2C1; 
+    writer.addLine(cx, yRow1, cx, yRow2, "FRAME", colorLine);
+    cx += wR2C2;
+    writer.addLine(cx, yRow1, cx, yRow2, "FRAME", colorLine);
+    cx += wR2C3;
+    writer.addLine(cx, yRow1, cx, yRow2, "FRAME", colorLine);
 
     // --- Fill Text ---
     const ty1 = cellY - 3.5;
-    writer.addText(cellX + 1, ty1, `Item: ${startItemIdx + slotIdx + 1}`, txtH);
-    writer.addText(cellX + w1 + 1, ty1, `Qty: ${item.qty}`, txtH);
-    writer.addText(cellX + w1 + w2 + 1, ty1, `Thk: ${item.thickness}`, txtH);
-    writer.addText(cellX + w1 + w2 + w3 + 1, ty1, `Mat: ${item.material}`, txtH);
-    writer.addText(cellX + w1 + w2 + w3 + w4 + 1, ty1, `Coat: ${item.coating}`, txtH);
+    writer.addText(cellX + 1, ty1, `Desc: ${item.description}`, txtH);
+    writer.addText(cellX + wR1C1 + 1, ty1, `Mat: ${item.material}`, txtH);
 
-    const ty2 = yAttr - 3.5;
-    writer.addText(cellX + 1, ty2, `Tag: ${item.tagNo}`, txtH);
-    writer.addText(cellX + wTag + 1, ty2, `Desc: ${item.description}`, txtH);
+    const ty2 = yRow1 - 3.5;
+    writer.addText(cellX + 1, ty2, `Item: ${startItemIdx + slotIdx + 1}`, txtH);
+    writer.addText(cellX + wR2C1 + 1, ty2, `Thk: ${item.thickness}`, txtH);
+    writer.addText(cellX + wR2C1 + wR2C2 + 1, ty2, `Qty: ${item.qty}`, txtH);
+    writer.addText(cellX + wR2C1 + wR2C2 + wR2C3 + 1, ty2, `Coating: ${item.coating}`, txtH);
 
-    const ty3 = cellBot + 1.5;
-    writer.addText(cellX + 1, ty3, `Note: ${item.notes}`, txtH);
+    const ty3 = yRow2 - 3.5;
+    writer.addText(cellX + 1, ty3, `Tag No: ${item.tagNo}`, txtH);
+
+    const tyNote = cellBot + 1.5;
+    writer.addText(cellX + 1, tyNote, `Note: ${item.notes}`, txtH);
 
     // --- SVG Drawing ---
     if (item.sketchSvg) {
-        // Sketch Area: Y range [yDesc] down to [yNote]
-        // Height = yDesc - yNote = (cellY - 10) - (cellBot + 5) = 65 - 15 = 50mm
-        const sketchH = 50;
+        const sketchH = 45;
         const sketchW = cellW - 4; // Margin
-        
-        // Target Box Center
         const targetCx = cellX + cellW/2;
-        const targetCy = (yDesc + yNote) / 2;
-        
-        // Add SVG to specific target
+        const targetCy = (yRow3 + yNote) / 2;
         addSvgToDxf(writer, item.sketchSvg, targetCx, targetCy, sketchW, sketchH);
     }
 };
@@ -352,12 +358,6 @@ const addSvgToDxf = (writer: DxfWriter, svgString: string, tx: number, ty: numbe
     const scale = Math.min(scaleX, scaleY) * 0.9; // 90% fill margin
 
     // 3. Transform Helper
-    // SVG Coordinate System: Y Down. DXF Coordinate System: Y Up.
-    // SVG Center (vbW/2, vbH/2) -> DXF Target (tx, ty)
-    // Formula:
-    // dxf_x = tx + (svg_x - center_x) * scale
-    // dxf_y = ty - (svg_y - center_y) * scale  (Flip Y relative to center)
-    
     const transformPt = (x: number, y: number) => {
         return {
             x: tx + (x - vbW/2) * scale,
@@ -381,7 +381,6 @@ const addSvgToDxf = (writer: DxfWriter, svgString: string, tx: number, ty: numbe
              }
          }
 
-         // Local transformation logic
          const applyLocal = (x: number, y: number) => {
              if (rot !== 0) {
                  const rad = rot * Math.PI / 180;
@@ -426,7 +425,6 @@ const addSvgToDxf = (writer: DxfWriter, svgString: string, tx: number, ty: numbe
              const y = parseFloat(el.getAttribute("y") || "0");
              const w = parseFloat(el.getAttribute("width") || "0");
              const h = parseFloat(el.getAttribute("height") || "0");
-             // Transform corners
              const pts = [
                  {x, y}, {x: x+w, y}, {x: x+w, y: y+h}, {x, y: y+h}
              ].map(p => applyLocal(p.x, p.y)).map(p => transformPt(p.x, p.y));
@@ -462,12 +460,10 @@ const addSvgToDxf = (writer: DxfWriter, svgString: string, tx: number, ty: numbe
                             if (pts.length > 1) writer.addPolyline(pts, true, getLayer(el), getColor(el));
                             pts = [];
                         } else if (cmd === "Q") {
-                            // Quadratic Bezier Interpolation
                             const x1 = parseFloat(commands[++i]);
                             const y1 = parseFloat(commands[++i]);
                             const x = parseFloat(commands[++i]);
                             const y = parseFloat(commands[++i]);
-                            
                             const p0 = currLocal;
                             const steps = 6;
                             for(let s=1; s<=steps; s++) {
@@ -495,13 +491,7 @@ const addSvgToDxf = (writer: DxfWriter, svgString: string, tx: number, ty: numbe
              const fsAttr = el.getAttribute("font-size");
              if(fsAttr) fontSize = parseFloat(fsAttr);
              
-             // Scale font size
              const finalH = fontSize * scale;
-             
-             // Calculate rotation. 
-             // SVG +Rot is CW (screen Y down). DXF +Rot is CCW (cartesian Y up).
-             // Since we flip Y in transformPt, the visual direction of rotation is mirrored.
-             // Visually -90 (up) in SVG becomes +90 in DXF.
              let finalRot = -rot; 
              
              let align: 'left'|'center'|'right' = 'left';

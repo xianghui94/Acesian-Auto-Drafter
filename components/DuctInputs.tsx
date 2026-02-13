@@ -310,6 +310,10 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
 export const BlindPlateInputs: React.FC<InputProps> = ({ params, onChange, onFocus, onBlur }) => (
     <>
         <NumInput label="Diameter Ø" fieldId="d1" value={params.d1} onChange={v => onChange('d1', v)} onFocus={onFocus} onBlur={onBlur} suffix="mm" />
+        <div className="grid grid-cols-2 gap-2">
+            <NumInput label="P.C.D" fieldId="pcd" value={params.pcd} onChange={v => onChange('pcd', v)} onFocus={onFocus} onBlur={onBlur} suffix="mm" />
+            <NumInput label="Holes" fieldId="holeCount" value={params.holeCount} onChange={v => onChange('holeCount', v)} onFocus={onFocus} onBlur={onBlur} suffix="" step={2} />
+        </div>
     </>
 );
 
@@ -323,6 +327,10 @@ export const BlastGateDamperInputs: React.FC<InputProps> = ({ params, onChange, 
 export const AngleFlangeInputs: React.FC<InputProps> = ({ params, onChange, onFocus, onBlur }) => (
     <>
         <NumInput label="Diameter Ø" fieldId="d1" value={params.d1} onChange={v => onChange('d1', v)} onFocus={onFocus} onBlur={onBlur} />
+        <div className="grid grid-cols-2 gap-2">
+            <NumInput label="P.C.D" fieldId="pcd" value={params.pcd} onChange={v => onChange('pcd', v)} onFocus={onFocus} onBlur={onBlur} suffix="mm" />
+            <NumInput label="Holes" fieldId="holeCount" value={params.holeCount} onChange={v => onChange('holeCount', v)} onFocus={onFocus} onBlur={onBlur} suffix="" step={2} />
+        </div>
     </>
 );
 
@@ -338,4 +346,33 @@ export const OffsetInputs: React.FC<InputProps> = ({ params, onChange, onFocus, 
             <TextAreaInput label="Flange 2 Remark (Right)" value={params.flangeRemark2 || ""} onChange={v => onChange('flangeRemark2', v)} onFocus={onFocus} onBlur={onBlur} />
         </div>
     </>
+);
+
+export const SaddleInputs: React.FC<InputProps> = ({ params, onChange, onFocus, onBlur }) => (
+    <>
+        <NumInput label="Main Ø (D1)" fieldId="d1" value={params.d1} onChange={v => onChange('d1', v)} onFocus={onFocus} onBlur={onBlur} />
+        <NumInput label="Tap Ø (D2)" fieldId="d2" value={params.d2} onChange={v => onChange('d2', v)} onFocus={onFocus} onBlur={onBlur} />
+        <NumInput label="Collar L" fieldId="length" value={params.length} onChange={v => onChange('length', v)} onFocus={onFocus} onBlur={onBlur} />
+        
+        {/* Flange Remarks */}
+        <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
+            <TextAreaInput label="Flange Remark" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} onFocus={onFocus} onBlur={onBlur} />
+        </div>
+    </>
+);
+
+export const ManualInputs: React.FC<InputProps> = ({ params, onChange, onFocus, onBlur }) => (
+    <div className="col-span-2 md:col-span-3 space-y-4">
+        <div className="p-4 bg-blue-50 text-blue-700 text-sm rounded border border-blue-100 flex items-start gap-2">
+            <span className="text-lg">ℹ️</span>
+            <span><strong>Manual Mode:</strong> Parametric sketch generation is disabled. Please enter a custom description below. The sketch area will be left blank.</span>
+        </div>
+        <TextAreaInput 
+            label="Description" 
+            value={params.userDescription || ""} 
+            onChange={v => onChange('userDescription', v)} 
+            onFocus={onFocus} 
+            onBlur={onBlur} 
+        />
+    </div>
 );

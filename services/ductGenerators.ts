@@ -11,3 +11,4 @@ export * from './generators/blindPlate';
 export * from './generators/blastGate';
 export * from './generators/angleFlange';
 export * from './generators/offset';
+export * from './generators/saddle';
