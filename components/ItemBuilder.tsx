@@ -20,6 +20,13 @@ const getDefaultParams = (type: ComponentType): DuctParams => {
       case ComponentType.REDUCER: return { d1: 500, d2: 300, length: 300, extension1: 50, extension2: 50, reducerType: "Concentric" };
       case ComponentType.STRAIGHT: return { d1: 300, length: 1200 };
       case ComponentType.TEE: return { main_d: 500, tap_d: 300, length: 500, branch_l: 100 };
+      // Lateral Tee: Default derived from (300*1.414) + 100 + 100 = ~624
+      // Branch L default: (300 * 1.414) + 200 = ~624
+      case ComponentType.LATERAL_TEE: {
+          const d2 = 300;
+          const gap = d2 * 1.4142;
+          return { d1: 500, d2: d2, length: Math.round(gap + 200), a_len: 100, b_len: 100, branch_len: Math.round(gap + 200) }; 
+      }
       case ComponentType.TRANSFORMATION: return { d1: 500, width: 500, height: 500, length: 300, offset: 0 };
       case ComponentType.VOLUME_DAMPER: return { d1: 200, length: 150, actuation: "Handle" };
       case ComponentType.MULTIBLADE_DAMPER: return { d1: 700, length: 400, bladeType: "Parallel" };
@@ -190,6 +197,51 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         }
     }
 
+    // Lateral Tee Auto-Calc Logic
+    if (componentType === ComponentType.LATERAL_TEE) {
+         const d3 = key === 'd2' ? Number(val) : Number(newParams.d2 || 0);
+         const a = key === 'a_len' ? Number(val) : Number(newParams.a_len || 100);
+         const b = key === 'b_len' ? Number(val) : Number(newParams.b_len || 100);
+         const gap = d3 * 1.4142;
+
+         if (key === 'd2') {
+             // 1. Update B default if not dirty
+             let currentB = b;
+             if (shouldAutoCalc('b_len')) {
+                 currentB = d3 >= 1000 ? 150 : 100;
+                 newParams.b_len = currentB;
+             }
+             // 2. Update Length based on new Gap + A + B
+             if (shouldAutoCalc('length')) {
+                 newParams.length = Math.round(gap + a + currentB);
+             }
+             // 3. Update Branch Length default
+             if (shouldAutoCalc('branch_len')) {
+                 newParams.branch_len = Math.round(gap + 200);
+             }
+         }
+         else if (key === 'a_len') {
+             // Change a -> Update Length (L = gap + a + b)
+             if (shouldAutoCalc('length')) {
+                 newParams.length = Math.round(gap + Number(val) + b);
+             }
+         }
+         else if (key === 'b_len') {
+             // Change b -> Update Length (L = gap + a + b)
+             if (shouldAutoCalc('length')) {
+                 newParams.length = Math.round(gap + a + Number(val));
+             }
+         }
+         else if (key === 'length') {
+             // Change Length -> Update b (Standard practice: Outlet collar absorbs length change)
+             // L = gap + a + b  =>  b = L - gap - a
+             if (shouldAutoCalc('b_len')) {
+                 const newB = Math.max(0, Math.round(Number(val) - gap - a));
+                 newParams.b_len = newB;
+             }
+         }
+    }
+
     // Flange Standard Auto-Calc for Blind Plate and Angle Flange
     if ((componentType === ComponentType.BLIND_PLATE || componentType === ComponentType.ANGLE_FLANGE) && key === 'd1') {
         const d = Number(val);
@@ -276,6 +328,8 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         description = `Angle Flange Ø${params.d1}`;
     } else if (componentType === ComponentType.TEE) {
         description = `Tee Ø${params.main_d} / Ø${params.tap_d}`;
+    } else if (componentType === ComponentType.LATERAL_TEE) {
+        description = `Lateral Tee (45°) Ø${params.d1} / Ø${params.d2}`;
     } else if (componentType === ComponentType.OFFSET) {
         if (params.d1 !== params.d2) {
              description = `Reducing Offset Ø${params.d1}-Ø${params.d2} / L=${params.length} / H=${params.offset}`;
@@ -310,6 +364,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
       case ComponentType.REDUCER: return <Inputs.ReducerInputs {...inputProps} />;
       case ComponentType.STRAIGHT: return <Inputs.StraightInputs {...inputProps} />;
       case ComponentType.TEE: return <Inputs.TeeInputs {...inputProps} />;
+      case ComponentType.LATERAL_TEE: return <Inputs.LateralTeeInputs {...inputProps} />;
       case ComponentType.TRANSFORMATION: return <Inputs.TransformationInputs {...inputProps} />;
       case ComponentType.VOLUME_DAMPER: return <Inputs.VolumeDamperInputs {...inputProps} />;
       case ComponentType.MULTIBLADE_DAMPER: return <Inputs.MultibladeDamperInputs {...inputProps} />;

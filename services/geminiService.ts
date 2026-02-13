@@ -1,9 +1,11 @@
+
 import { ComponentType, DuctParams } from "../types";
 import { 
     generateElbow, 
     generateReducer, 
     generateStraight, 
     generateTee, 
+    generateLateralTee,
     generateTransformation, 
     generateVolumeDamper, 
     generateMultibladeDamper, 
@@ -27,6 +29,7 @@ export const generateDuctDrawing = (type: ComponentType, params: DuctParams, act
         case ComponentType.REDUCER: return generateReducer(params, activeField);
         case ComponentType.STRAIGHT: return generateStraight(params, activeField);
         case ComponentType.TEE: return generateTee(params, activeField);
+        case ComponentType.LATERAL_TEE: return generateLateralTee(params, activeField);
         case ComponentType.TRANSFORMATION: return generateTransformation(params, activeField);
         case ComponentType.VOLUME_DAMPER: return generateVolumeDamper(params, activeField);
         case ComponentType.MULTIBLADE_DAMPER: return generateMultibladeDamper(params, activeField);
