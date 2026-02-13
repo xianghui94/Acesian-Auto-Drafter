@@ -6,7 +6,91 @@ import { OrderSheet } from './components/OrderSheet';
 import { OrderHeader, OrderItem } from './types';
 import { downloadSheetDxf } from './utils/dxfWriter';
 
+// --- Lock Screen Component ---
+const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
+    const [passcode, setPasscode] = useState("");
+    const [error, setError] = useState(false);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (passcode === "admin") {
+            onUnlock();
+        } else {
+            setError(true);
+            setPasscode("");
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-cad-100">
+            <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm border border-cad-200 animate-[fadeIn_0.3s_ease-out]">
+                <div className="flex flex-col items-center mb-6">
+                    <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4 border border-blue-100 shadow-inner overflow-hidden relative">
+                        {/* Try to load logo, fallback to icon */}
+                        <img 
+                            src="/logo_acesian.png" 
+                            alt="Logo" 
+                            className="w-16 h-16 object-contain z-10 relative"
+                            onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }} 
+                        />
+                        <span className="text-3xl absolute z-0 text-blue-200">🔒</span>
+                    </div>
+                    <h2 className="text-xl font-bold text-cad-800">Acesian Auto-Drafter</h2>
+                    <p className="text-xs text-cad-500 font-medium uppercase tracking-wider mt-1">System Locked</p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="relative">
+                        <input
+                            type="password"
+                            value={passcode}
+                            onChange={(e) => { setPasscode(e.target.value); setError(false); }}
+                            className={`w-full px-4 py-3 rounded-lg border text-center font-mono text-lg outline-none focus:ring-2 transition-all ${
+                                error 
+                                ? 'border-red-300 bg-red-50 text-red-900 focus:ring-red-200 placeholder-red-300' 
+                                : 'border-cad-300 bg-cad-50 text-cad-900 focus:border-blue-500 focus:ring-blue-200'
+                            }`}
+                            placeholder="Enter Passcode"
+                            autoFocus
+                        />
+                    </div>
+                    
+                    {error && (
+                        <p className="text-xs text-red-600 text-center font-bold animate-pulse bg-red-100 py-1 rounded">
+                            Incorrect Passcode
+                        </p>
+                    )}
+
+                    <button
+                        type="submit"
+                        className="w-full bg-cad-900 hover:bg-black text-white font-bold py-3 rounded-lg shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                        <span>Unlock System</span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                    </button>
+                </form>
+
+                <div className="mt-8 text-center border-t border-cad-100 pt-4">
+                    <p className="text-[10px] text-cad-400">
+                        Authorized Personnel Only<br/>
+                        Acesian Technologies Pte Ltd
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function App() {
+  // Auth State
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    try {
+        return sessionStorage.getItem('acesian_auth') === 'true';
+    } catch {
+        return false;
+    }
+  });
+
   // Order Header State
   const [header, setHeader] = useState<OrderHeader>({
     company: "--- Pte Ltd",
@@ -38,6 +122,11 @@ export default function App() {
           ...item,
           itemNo: index + 1
       }));
+  };
+
+  const handleUnlock = () => {
+    sessionStorage.setItem('acesian_auth', 'true');
+    setIsAuthenticated(true);
   };
 
   const handleHeaderChange = (field: keyof OrderHeader, value: string) => {
@@ -146,6 +235,10 @@ export default function App() {
     }
     downloadSheetDxf(items, header);
   };
+
+  if (!isAuthenticated) {
+      return <LockScreen onUnlock={handleUnlock} />;
+  }
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-cad-50 font-sans text-cad-900 selection:bg-blue-100 print:h-auto print:w-auto print:overflow-visible print:block">
