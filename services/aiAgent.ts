@@ -26,6 +26,11 @@ Rules:
 7. **REASONING:** Briefly explain why confidence is low if < 1.0 (e.g., "Missing radius, assumed 1.0D").
 8. Return a JSON object with a key "items" containing the array of extracted items.
 9. Ensure all numeric dimensions are numbers, not strings.
+10. **CRITICAL ELBOW RADIUS RULE (Throat Radius):**
+    When processing elbows with notations like "R 1D" or "R 1.5D", the 'radius' parameter must represent the INNER throat/neck radius, not the centerline radius! 
+    - If text says "R 1D", calculate radius = d1 * 0.5. (Example: d1=800 and R 1D -> radius=400).
+    - If text says "R 1.5D", calculate radius = d1 * 1.0. (Example: d1=800 and R 1.5D -> radius=800).
+    Do not blindly copy the "1D" multiplier. Always apply this math.
 
 Example Output Format:
 {
