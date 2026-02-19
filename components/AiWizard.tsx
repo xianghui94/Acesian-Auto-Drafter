@@ -1,17 +1,15 @@
-
 import React, { useState } from 'react';
 import { parseExcelWithGemini } from '../services/aiAgent';
 import { OrderItem, ComponentType } from '../types';
 
 interface AiWizardProps {
-    apiKey: string;
     onClose: () => void;
     onImport: (items: any[]) => void;
 }
 
 type Stage = 'UPLOAD' | 'THINKING' | 'VERIFY';
 
-export const AiWizard: React.FC<AiWizardProps> = ({ apiKey, onClose, onImport }) => {
+export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
     const [stage, setStage] = useState<Stage>('UPLOAD');
     const [file, setFile] = useState<File | null>(null);
     const [extractedItems, setExtractedItems] = useState<Partial<OrderItem>[]>([]);
@@ -26,14 +24,10 @@ export const AiWizard: React.FC<AiWizardProps> = ({ apiKey, onClose, onImport })
 
     const startProcessing = async () => {
         if (!file) return;
-        if (!apiKey) {
-            setError("API Key is missing. Please add it in settings.");
-            return;
-        }
 
         setStage('THINKING');
         try {
-            const items = await parseExcelWithGemini(file, apiKey);
+            const items = await parseExcelWithGemini(file);
             // Add temp IDs
             const itemsWithIds = items.map((item, idx) => ({
                 ...item,

@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "@google/generative-ai";
 import readXlsxFile from 'read-excel-file';
 import { ComponentType, OrderItem } from "../types";
 
@@ -36,7 +36,7 @@ Example Output Format:
 }
 `;
 
-export const parseExcelWithGemini = async (file: File, apiKey: string): Promise<Partial<OrderItem>[]> => {
+export const parseExcelWithGemini = async (file: File): Promise<Partial<OrderItem>[]> => {
     try {
         // 1. Read Excel File
         const rows = await readXlsxFile(file);
@@ -44,22 +44,21 @@ export const parseExcelWithGemini = async (file: File, apiKey: string): Promise<
         // Convert to simple CSV-like string for token efficiency
         const csvContent = rows.map(row => row.join(" | ")).join("\n");
 
-        // 2. Initialize Gemini
-        // Guidelines: The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        // 2. Initialize Gemini with Environment Variable
+        const model = genAI.getGenerativeModel({;
         
-        // 3. Configure Model
-        // Guidelines: Use 'gemini-3-flash-preview' for basic text tasks.
+        // 3. Call API with 3-flash-preview (recommended for text tasks)
+        const prompt = `Here is the BOM data:\n${csvContent}`;
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
-            contents: `Here is the BOM data:\n${csvContent}`,
+            contents: prompt,
             config: {
                 systemInstruction: SYSTEM_INSTRUCTION,
                 responseMimeType: "application/json"
             }
         });
 
-        // 5. Parse Response
+        // 4. Parse Response
         const responseText = response.text;
         if (!responseText) throw new Error("Empty response from AI");
 

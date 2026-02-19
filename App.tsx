@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ItemBuilder } from './components/ItemBuilder';
@@ -108,12 +107,6 @@ export default function App() {
   
   // AI Feature State
   const [showAiWizard, setShowAiWizard] = useState(false);
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('acesian_api_key') || "");
-
-  const updateApiKey = (key: string) => {
-      setApiKey(key);
-      localStorage.setItem('acesian_api_key', key);
-  };
 
   const reindexItems = (list: OrderItem[]): OrderItem[] => {
       return list.map((item, index) => ({
@@ -271,8 +264,6 @@ export default function App() {
           onSaveProject={handleSaveProject}
           onLoadProject={handleLoadProject}
           onOpenAiWizard={() => setShowAiWizard(true)}
-          onApiKeyChange={updateApiKey}
-          apiKey={apiKey}
       />
       
       <main className="flex-1 flex flex-col h-full relative overflow-hidden print:h-auto print:overflow-visible print:block">
@@ -339,7 +330,6 @@ export default function App() {
         {/* AI Wizard Modal */}
         {showAiWizard && (
             <AiWizard 
-                apiKey={apiKey} 
                 onClose={() => setShowAiWizard(false)} 
                 onImport={handleAiImport} 
             />

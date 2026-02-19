@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { OrderHeader } from '../types';
 
@@ -9,8 +8,6 @@ interface SidebarProps {
   onSaveProject: () => void;
   onLoadProject: (file: File) => void;
   onOpenAiWizard?: () => void;
-  onApiKeyChange?: (key: string) => void;
-  apiKey?: string;
 }
 
 interface SavedProfile {
@@ -21,7 +18,7 @@ interface SavedProfile {
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
     header, onChange, onBulkChange, onSaveProject, onLoadProject,
-    onOpenAiWizard, onApiKeyChange, apiKey = ""
+    onOpenAiWizard
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -159,20 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div className="p-6 space-y-4">
-            {/* API Key Input (Hidden functionality for simplicity in UI, usually in settings modal but here for access) */}
-            <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Gemini API Key</label>
-                <input 
-                    type="password" 
-                    value={apiKey} 
-                    onChange={(e) => onApiKeyChange && onApiKeyChange(e.target.value)}
-                    placeholder="Enter Key..."
-                    className="w-full text-xs p-1 border border-slate-300 rounded focus:border-blue-500 outline-none font-mono"
-                />
-            </div>
             
-            <div className="border-t border-cad-200 my-2"></div>
-
             <InputGroup label="Company" value={header.company} onChange={(v) => onChange('company', v)} />
             <InputGroup label="From" value={header.from} onChange={(v) => onChange('from', v)} />
             <InputGroup label="Project" value={header.project} onChange={(v) => onChange('project', v)} />
