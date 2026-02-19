@@ -19,8 +19,13 @@ Rules:
    - For REDUCER: 'd1', 'd2', 'length'.
 4. Extract quantity, thickness, material, and tagNo.
 5. Capture the 'originalDescription' - the raw text description from the row that you used to make the decision.
-6. Return a JSON object with a key "items" containing the array of extracted items.
-7. Ensure all numeric dimensions are numbers, not strings.
+6. **CONFIDENCE SCORE:** Assign a 'confidence' score (0.0 to 1.0).
+   - 1.0: Exact match, all dimensions found.
+   - 0.8: Type clear, but calculated/inferred some dimensions (e.g. inferred Radius from Diameter).
+   - 0.5: Ambiguous description or missing critical dimensions.
+7. **REASONING:** Briefly explain why confidence is low if < 1.0 (e.g., "Missing radius, assumed 1.0D").
+8. Return a JSON object with a key "items" containing the array of extracted items.
+9. Ensure all numeric dimensions are numbers, not strings.
 
 Example Output Format:
 {
@@ -32,13 +37,15 @@ Example Output Format:
       "thickness": "0.8",
       "tagNo": "EF-01",
       "originalDescription": "ELBOW 90DEG 500DIA R=1.0D",
-      "params": { "d1": 500, "angle": 90, "radius": 250 }
+      "params": { "d1": 500, "angle": 90, "radius": 250 },
+      "confidence": 1.0,
+      "reasoning": "Exact match"
     }
   ]
 }
 `;
 
-export const parseExcelWithGemini = async (file: File, apiKey: string): Promise<(Partial<OrderItem> & { originalDescription?: string })[]> => {
+export const parseExcelWithGemini = async (file: File, apiKey: string): Promise<(Partial<OrderItem> & { originalDescription?: string, confidence?: number, reasoning?: string })[]> => {
     try {
         // 1. Read Excel File
         const rows = await readXlsxFile(file);

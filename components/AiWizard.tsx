@@ -14,6 +14,8 @@ interface AiWizardProps {
 interface EditableItem extends Partial<OrderItem> {
     params: DuctParams;
     originalDescription?: string;
+    confidence?: number;
+    reasoning?: string;
     validationStatus: 'ok' | 'warning' | 'error';
 }
 
@@ -95,6 +97,27 @@ const ParamEditor = ({ type, params, onChange }: { type: ComponentType, params: 
     }
 };
 
+const ConfidenceBadge = ({ score }: { score: number }) => {
+    let color = "bg-green-500";
+    let label = "High";
+    if (score < 0.6) {
+        color = "bg-red-500";
+        label = "Low";
+    } else if (score < 0.9) {
+        color = "bg-yellow-500";
+        label = "Med";
+    }
+
+    return (
+        <div className="flex items-center gap-1.5" title={`AI Confidence Score: ${(score * 100).toFixed(0)}%`}>
+            <div className={`w-2 h-2 rounded-full ${color} shadow-[0_0_8px_rgba(0,0,0,0.5)]`}></div>
+            <span className={`text-[10px] font-bold ${score < 0.6 ? 'text-red-400' : score < 0.9 ? 'text-yellow-400' : 'text-green-400'}`}>
+                {label}
+            </span>
+        </div>
+    );
+};
+
 export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
     const [stage, setStage] = useState<Stage>('UPLOAD');
     const [file, setFile] = useState<File | null>(null);
@@ -118,6 +141,7 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                 "Reading Excel file...",
                 "Identifying HVAC components...",
                 "Extracting geometry & dimensions...",
+                "Calculating confidence scores...",
                 "Validating engineering standards...",
                 "Preparing drafting preview..."
             ];
@@ -134,9 +158,14 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
 
     // Validation Logic
     const validateItem = (item: EditableItem): 'ok' | 'warning' | 'error' => {
+        // Critical Logic errors
         if (!item.componentType || item.componentType === ComponentType.MANUAL) return 'warning';
-        // Basic check: Needs at least D1 or specific params based on type
         if (!item.params.d1 && !item.params.main_d && !item.params.width) return 'error';
+        
+        // AI Confidence Check
+        // If the AI itself flagged it as low confidence, treat as warning
+        if (item.confidence !== undefined && item.confidence < 0.6) return 'warning';
+
         return 'ok';
     };
 
@@ -181,7 +210,6 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                 const type = item.componentType || ComponentType.ELBOW;
                 
                 // CRITICAL: Hydrate with auto-calculation rules
-                // This converts AI partial data (d1=1000) into valid geometric data (r=1000)
                 const safeParams = hydrateItemParams(type, item.params || {});
                 
                 const editableItem: EditableItem = {
@@ -191,10 +219,19 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                     params: safeParams,
                     description: generateDescription(type, safeParams),
                     originalDescription: (item as any).originalDescription || "—",
+                    confidence: (item as any).confidence || 0.5, // Default to low if missing
+                    reasoning: (item as any).reasoning || "",
                     validationStatus: 'ok' // Will be recalculated
                 };
                 editableItem.validationStatus = validateItem(editableItem);
                 return editableItem;
+            });
+            
+            // Sort items so Errors/Warnings (Low Confidence) appear first
+            processedItems.sort((a, b) => {
+                const scoreA = (a.validationStatus === 'error' ? 0 : a.validationStatus === 'warning' ? 1 : 2);
+                const scoreB = (b.validationStatus === 'error' ? 0 : b.validationStatus === 'warning' ? 1 : 2);
+                return scoreA - scoreB;
             });
             
             setExtractedItems(processedItems);
@@ -213,23 +250,21 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
             const item = { ...newItems[selectedIndex] };
 
             if (field === 'params' && paramKey) {
-                // When user manually edits, we just update that field
-                // We typically DO NOT auto-calc here to avoid fighting the user,
-                // or we could use hydrateItemParams if we wanted aggressive auto-calc.
-                // For now, let's trust the user's manual edit.
                 const newParams = { ...item.params, [paramKey]: val };
                 item.params = newParams;
-                // Auto update description
                 if (item.componentType) {
                     item.description = generateDescription(item.componentType, newParams);
                 }
+                // If user manually edits, we can assume confidence goes up to 1.0 (Manual Override)
+                item.confidence = 1.0; 
+                item.reasoning = "Manually Verified";
             } else {
                 (item as any)[field] = val;
-                // If type changes, reset params using hydrator
                 if (field === 'componentType') {
                     const newType = val as ComponentType;
                     item.params = getDefaultParams(newType);
                     item.description = generateDescription(newType, item.params);
+                    item.confidence = 1.0; // Reset confidence on type change
                 }
             }
             
@@ -364,7 +399,7 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                                     <span className="text-xs font-bold text-slate-400 uppercase">Items ({extractedItems.length})</span>
                                     <div className="flex gap-2">
                                         <span className="text-[10px] bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded border border-red-900/50">
-                                            {extractedItems.filter(i => i.validationStatus === 'error').length} Errors
+                                            {extractedItems.filter(i => i.validationStatus !== 'ok').length} Alerts
                                         </span>
                                     </div>
                                 </div>
@@ -388,8 +423,11 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                                                 <div dangerouslySetInnerHTML={{__html: generateDuctDrawing(item.componentType || ComponentType.ELBOW, item.params)}} className="w-full h-full scale-150" />
                                             </div>
                                             
-                                            <div className="overflow-hidden">
-                                                <div className="text-sm font-medium text-slate-200 truncate">{item.description}</div>
+                                            <div className="overflow-hidden flex-1">
+                                                <div className="flex justify-between items-center">
+                                                    <div className="text-sm font-medium text-slate-200 truncate pr-2">{item.description}</div>
+                                                    <ConfidenceBadge score={item.confidence || 0} />
+                                                </div>
                                                 <div className="text-xs text-slate-500 truncate">{item.originalDescription}</div>
                                             </div>
                                         </div>
@@ -411,10 +449,19 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                                                     <div dangerouslySetInnerHTML={{__html: svgPreview}} className="w-full h-full" />
                                                 </div>
                                                 
-                                                {/* Source Context Overlay */}
-                                                <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur p-3 rounded border border-slate-600 max-w-md shadow-lg">
-                                                    <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Original Excel Row</label>
-                                                    <p className="text-xs text-white font-mono">{item.originalDescription}</p>
+                                                {/* Confidence Banner */}
+                                                <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur p-3 rounded border border-slate-600 max-w-md shadow-lg flex flex-col gap-2">
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">AI Reasoning</label>
+                                                        <div className="flex items-center gap-2">
+                                                            <ConfidenceBadge score={item.confidence || 0} />
+                                                            <p className="text-xs text-slate-300 italic">{item.reasoning || "No explanation provided."}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="pt-2 border-t border-slate-700 mt-1">
+                                                        <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Source</label>
+                                                        <p className="text-xs text-white font-mono">{item.originalDescription}</p>
+                                                    </div>
                                                 </div>
                                             </div>
 
