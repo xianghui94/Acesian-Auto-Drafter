@@ -1,17 +1,14 @@
 
 import React, { useState, useRef } from 'react';
-import readXlsxFile from 'read-excel-file';
 import { Sidebar } from './components/Sidebar';
 import { ItemBuilder } from './components/ItemBuilder';
 import { OrderSheet } from './components/OrderSheet';
 import { OrderHeader, OrderItem, SavedProject } from './types';
 import { downloadSheetDxf } from './utils/dxfWriter';
-import { parseExcelDataWithAI } from './services/excelAgent';
 
-// --- Lock Screen Component (Separated Passcode & API Key) ---
-const LockScreen = ({ onUnlock }: { onUnlock: (apiKey?: string) => void }) => {
+// --- Lock Screen Component ---
+const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
     const [passcode, setPasscode] = useState("");
-    const [apiKey, setApiKey] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -30,14 +27,7 @@ const LockScreen = ({ onUnlock }: { onUnlock: (apiKey?: string) => void }) => {
             return;
         }
 
-        // 2. Validate API Key format if provided
-        if (apiKey && apiKey.length < 20) {
-            setError("Invalid Google API Key format");
-            setLoading(false);
-            return;
-        }
-
-        onUnlock(apiKey || undefined);
+        onUnlock();
     };
 
     return (
@@ -64,7 +54,7 @@ const LockScreen = ({ onUnlock }: { onUnlock: (apiKey?: string) => void }) => {
                         </div>
                     )}
 
-                    {/* 1. App Passcode */}
+                    {/* App Passcode */}
                     <div className="space-y-1">
                         <label className="text-xs font-bold text-cad-600 uppercase">Access Passcode <span className="text-red-500">*</span></label>
                         <input
@@ -75,27 +65,6 @@ const LockScreen = ({ onUnlock }: { onUnlock: (apiKey?: string) => void }) => {
                             placeholder="Enter Access Code"
                             autoFocus
                         />
-                    </div>
-
-                    <div className="relative flex py-2 items-center">
-                        <div className="flex-grow border-t border-cad-200"></div>
-                        <span className="flex-shrink-0 mx-2 text-cad-400 text-[10px] uppercase">AI Configuration (Optional)</span>
-                        <div className="flex-grow border-t border-cad-200"></div>
-                    </div>
-
-                    {/* 2. API Key */}
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-cad-600 uppercase">Google Gemini API Key</label>
-                        <input
-                            type="password"
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                            className="w-full px-4 py-3 rounded-lg border border-cad-300 bg-white text-center font-mono text-sm outline-none focus:ring-2 focus:border-purple-500 focus:ring-purple-200 placeholder:text-cad-300"
-                            placeholder="Leave empty for Manual Mode"
-                        />
-                        <div className="text-[10px] text-center text-cad-400">
-                            Required only for "Import Excel" feature. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">Get Key</a>
-                        </div>
                     </div>
                     
                     <button
@@ -117,9 +86,6 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return sessionStorage.getItem('acesian_auth_token') === 'valid';
   });
-
-  // Derived state to check if AI is available
-  const hasApiKey = !!sessionStorage.getItem('acesian_api_key');
 
   // Order Header State
   const [header, setHeader] = useState<OrderHeader>({
@@ -144,10 +110,6 @@ export default function App() {
   const [insertIndex, setInsertIndex] = useState<number | null>(null);
   const [showSummary, setShowSummary] = useState(true);
   const [includeSummaryInPrint, setIncludeSummaryInPrint] = useState(true);
-  
-  // AI Agent State
-  const [isProcessingExcel, setIsProcessingExcel] = useState(false);
-  const excelInputRef = useRef<HTMLInputElement>(null);
 
   const reindexItems = (list: OrderItem[]): OrderItem[] => {
       return list.map((item, index) => ({
@@ -156,13 +118,8 @@ export default function App() {
       }));
   };
 
-  const handleUnlock = (key?: string) => {
+  const handleUnlock = () => {
     sessionStorage.setItem('acesian_auth_token', 'valid');
-    if (key) {
-        sessionStorage.setItem('acesian_api_key', key);
-    } else {
-        sessionStorage.removeItem('acesian_api_key');
-    }
     setIsAuthenticated(true);
   };
 
@@ -264,49 +221,6 @@ export default function App() {
       reader.readAsText(file);
   };
 
-  // --- Excel Agent Logic ---
-  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!hasApiKey) {
-          alert("Feature Locked: No API Key provided during login.\n\nPlease reload the app and enter a valid Google Gemini API Key to use AI features.");
-          e.target.value = ""; // Reset file input
-          return;
-      }
-      
-      if (e.target.files && e.target.files.length > 0) {
-          const file = e.target.files[0];
-          setIsProcessingExcel(true);
-          try {
-              const rows = await readXlsxFile(file);
-              // Rows is an array of arrays. Convert to array of objects for better AI context.
-              // Assume Row 0 is header
-              const headers = rows[0].map(h => String(h));
-              const data = rows.slice(1).map(row => {
-                  let obj: any = {};
-                  headers.forEach((h, i) => { obj[h] = row[i]; });
-                  return obj;
-              });
-
-              const aiItems = await parseExcelDataWithAI(data);
-              
-              if (aiItems.length > 0) {
-                  const confirmMsg = `AI successfully parsed ${aiItems.length} items.\n\nClick OK to append them to your order sheet.`;
-                  if (window.confirm(confirmMsg)) {
-                      setItems(prev => reindexItems([...prev, ...aiItems]));
-                  }
-              } else {
-                  alert("AI could not identify any ductwork items in this file.");
-              }
-
-          } catch (err) {
-              console.error(err);
-              alert("Error processing Excel file. Ensure it is a valid .xlsx or .csv.");
-          } finally {
-              setIsProcessingExcel(false);
-              e.target.value = ""; // Reset
-          }
-      }
-  };
-
   if (!isAuthenticated) {
       return <LockScreen onUnlock={handleUnlock} />;
   }
@@ -314,15 +228,6 @@ export default function App() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-cad-50 font-sans text-cad-900 selection:bg-blue-100 print:h-auto print:w-auto print:overflow-visible print:block">
       
-      {/* Loading Overlay */}
-      {isProcessingExcel && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center text-white">
-              <div className="text-4xl animate-bounce mb-4">🤖</div>
-              <h2 className="text-2xl font-bold">AI Agent is Thinking...</h2>
-              <p className="text-sm opacity-80">Reading Excel • Interpreting Data • Generating Drawings</p>
-          </div>
-      )}
-
       <Sidebar 
           header={header} 
           onChange={handleHeaderChange}
@@ -343,20 +248,6 @@ export default function App() {
         <div className="flex-1 relative overflow-y-auto bg-cad-200 print:h-auto print:overflow-visible print:bg-white print:block">
            <div className="no-print absolute top-4 right-8 z-30 flex flex-col items-end gap-2">
               <div className="flex gap-2">
-                  <button 
-                     onClick={() => hasApiKey ? excelInputRef.current?.click() : alert("Feature Locked: No API Key provided during login.\n\nPlease reload and enter a valid Google Gemini API Key.")}
-                     className={`${hasApiKey ? 'bg-purple-600 hover:bg-purple-700 animate-[pulse_3s_infinite]' : 'bg-gray-400 cursor-not-allowed'} text-white px-4 py-2 rounded shadow-lg text-sm font-bold flex items-center gap-2 transition-colors`}
-                     title={hasApiKey ? "Import Excel with Gemini AI" : "Locked: No API Key"}
-                  >
-                     {hasApiKey ? (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                     ) : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                     )}
-                     Import Excel {hasApiKey ? '(AI)' : '(Locked)'}
-                  </button>
-                  <input type="file" ref={excelInputRef} onChange={handleExcelUpload} accept=".xlsx, .csv" className="hidden" disabled={!hasApiKey} />
-
                   <button 
                      onClick={() => setItems([])}
                      className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded shadow border border-red-200 text-sm font-semibold"
