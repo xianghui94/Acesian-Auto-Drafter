@@ -1,18 +1,108 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { parseExcelWithGemini } from '../services/aiAgent';
-import { OrderItem, ComponentType } from '../types';
+import { generateDuctDrawing } from '../services/geminiService';
+import { generateDescription } from '../services/descriptionService';
+import { OrderItem, ComponentType, DuctParams } from '../types';
+import { getDefaultParams } from './ItemBuilder';
 
 interface AiWizardProps {
     onClose: () => void;
     onImport: (items: any[]) => void;
 }
 
+// Extracted item now holds real params object, not JSON string
 interface EditableItem extends Partial<OrderItem> {
-    paramStr: string; // JSON string for editing params
+    params: DuctParams;
 }
 
 type Stage = 'UPLOAD' | 'THINKING' | 'VERIFY';
+
+// --- Small Input Components for Cell Rendering ---
+const MiniInput = ({ label, value, onChange }: { label: string, value: any, onChange: (v: any) => void }) => (
+    <div className="flex flex-col w-[60px]">
+        <label className="text-[9px] text-slate-400 uppercase font-bold">{label}</label>
+        <input 
+            type="number" 
+            value={value || ''} 
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="w-full bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-white text-xs focus:border-blue-500 outline-none h-6"
+        />
+    </div>
+);
+
+const ParamEditor = ({ type, params, onChange }: { type: ComponentType, params: DuctParams, onChange: (key: string, val: any) => void }) => {
+    switch (type) {
+        case ComponentType.ELBOW:
+            return (
+                <div className="flex gap-2">
+                    <MiniInput label="Ø" value={params.d1} onChange={v => onChange('d1', v)} />
+                    <MiniInput label="Angle" value={params.angle} onChange={v => onChange('angle', v)} />
+                    <MiniInput label="Rad" value={params.radius} onChange={v => onChange('radius', v)} />
+                </div>
+            );
+        case ComponentType.REDUCER:
+            return (
+                <div className="flex gap-2">
+                    <MiniInput label="Ø1" value={params.d1} onChange={v => onChange('d1', v)} />
+                    <MiniInput label="Ø2" value={params.d2} onChange={v => onChange('d2', v)} />
+                    <MiniInput label="L" value={params.length} onChange={v => onChange('length', v)} />
+                </div>
+            );
+        case ComponentType.STRAIGHT:
+            return (
+                <div className="flex gap-2">
+                    <MiniInput label="Ø" value={params.d1} onChange={v => onChange('d1', v)} />
+                    <MiniInput label="L" value={params.length} onChange={v => onChange('length', v)} />
+                </div>
+            );
+        case ComponentType.TEE:
+        case ComponentType.CROSS_TEE:
+            return (
+                <div className="flex gap-2">
+                    <MiniInput label="Main Ø" value={params.main_d} onChange={v => onChange('main_d', v)} />
+                    <MiniInput label="Tap Ø" value={params.tap_d} onChange={v => onChange('tap_d', v)} />
+                    <MiniInput label="Body L" value={params.length} onChange={v => onChange('length', v)} />
+                    <MiniInput label="Brnch L" value={params.branch_l} onChange={v => onChange('branch_l', v)} />
+                </div>
+            );
+        case ComponentType.LATERAL_TEE:
+        case ComponentType.BOOT_TEE:
+            return (
+                <div className="flex gap-2">
+                    <MiniInput label="D1" value={params.d1} onChange={v => onChange('d1', v)} />
+                    <MiniInput label="D2" value={params.d2} onChange={v => onChange('d2', v)} />
+                    <MiniInput label="L" value={params.length} onChange={v => onChange('length', v)} />
+                </div>
+            );
+        case ComponentType.OFFSET:
+             return (
+                <div className="flex gap-2">
+                    <MiniInput label="D1" value={params.d1} onChange={v => onChange('d1', v)} />
+                    <MiniInput label="D2" value={params.d2} onChange={v => onChange('d2', v)} />
+                    <MiniInput label="L" value={params.length} onChange={v => onChange('length', v)} />
+                    <MiniInput label="H" value={params.offset} onChange={v => onChange('offset', v)} />
+                </div>
+            );
+        case ComponentType.TRANSFORMATION:
+             return (
+                <div className="flex gap-2">
+                    <MiniInput label="Ø" value={params.d1} onChange={v => onChange('d1', v)} />
+                    <MiniInput label="W" value={params.width} onChange={v => onChange('width', v)} />
+                    <MiniInput label="H" value={params.height} onChange={v => onChange('height', v)} />
+                    <MiniInput label="L" value={params.length} onChange={v => onChange('length', v)} />
+                </div>
+            );
+        default:
+            // Fallback for types with just D1/Length or special params
+            return (
+                <div className="flex gap-2">
+                    <MiniInput label="Ø/D1" value={params.d1} onChange={v => onChange('d1', v)} />
+                    {params.length !== undefined && <MiniInput label="L" value={params.length} onChange={v => onChange('length', v)} />}
+                </div>
+            );
+    }
+};
 
 export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
     const [stage, setStage] = useState<Stage>('UPLOAD');
@@ -20,7 +110,7 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
     const [extractedItems, setExtractedItems] = useState<EditableItem[]>([]);
     const [error, setError] = useState<string>("");
     
-    // API Key State - Persisted locally
+    // API Key State
     const [apiKey, setApiKey] = useState(() => localStorage.getItem('acesian_gemini_key') || "");
 
     const handleApiKeyChange = (val: string) => {
@@ -44,17 +134,27 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
 
         setStage('THINKING');
         try {
-            const items = await parseExcelWithGemini(file, apiKey);
-            // Add temp IDs and prepare editable string for params
-            const itemsWithIds: EditableItem[] = items.map((item, idx) => ({
-                ...item,
-                id: `ai-${Date.now()}-${idx}`,
-                description: "AI Generated",
-                // Ensure params is an object before stringifying, defaulting to empty object
-                params: item.params || {},
-                paramStr: JSON.stringify(item.params || {})
-            }));
-            setExtractedItems(itemsWithIds);
+            const rawItems = await parseExcelWithGemini(file, apiKey);
+            
+            // Post-process items: Add Defaults, IDs, Descriptions
+            const processedItems: EditableItem[] = rawItems.map((item, idx) => {
+                const type = item.componentType || ComponentType.ELBOW;
+                // Merge extracted params with defaults to ensure all required fields exist
+                const safeParams = { 
+                    ...getDefaultParams(type), 
+                    ...(item.params || {}) 
+                };
+                
+                return {
+                    ...item,
+                    id: `ai-${Date.now()}-${idx}`,
+                    componentType: type,
+                    params: safeParams,
+                    description: generateDescription(type, safeParams)
+                };
+            });
+            
+            setExtractedItems(processedItems);
             setStage('VERIFY');
         } catch (err) {
             console.error(err);
@@ -65,30 +165,44 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
 
     // --- Editing Handlers ---
 
-    const handleUpdateItem = (index: number, field: keyof EditableItem, value: any) => {
-        const newItems = [...extractedItems];
-        newItems[index] = { ...newItems[index], [field]: value };
-        setExtractedItems(newItems);
+    const handleParamChange = (index: number, key: string, val: any) => {
+        setExtractedItems(prev => {
+            const newItems = [...prev];
+            const item = { ...newItems[index] };
+            const newParams = { ...item.params, [key]: val };
+            
+            // Auto-update Description
+            if (item.componentType) {
+                item.description = generateDescription(item.componentType, newParams);
+            }
+            
+            item.params = newParams;
+            newItems[index] = item;
+            return newItems;
+        });
     };
 
-    const handleFinish = () => {
-        // Validate and Parse JSON params before importing
-        const finalItems = [];
-        for (let i = 0; i < extractedItems.length; i++) {
-            const item = extractedItems[i];
-            try {
-                const parsedParams = JSON.parse(item.paramStr);
-                finalItems.push({
-                    ...item,
-                    params: parsedParams
-                });
-            } catch (e) {
-                alert(`Error in Row ${i + 1}: Invalid JSON in Params field.\n\nPlease fix the format before importing.`);
-                return;
-            }
-        }
-        onImport(finalItems);
-        onClose();
+    const handleTypeChange = (index: number, newType: ComponentType) => {
+        setExtractedItems(prev => {
+            const newItems = [...prev];
+            const item = { ...newItems[index] };
+            
+            // Load defaults for new type
+            item.componentType = newType;
+            item.params = getDefaultParams(newType);
+            item.description = generateDescription(newType, item.params);
+            
+            newItems[index] = item;
+            return newItems;
+        });
+    };
+
+    const handleMetaChange = (index: number, field: keyof EditableItem, val: any) => {
+        setExtractedItems(prev => {
+            const newItems = [...prev];
+            newItems[index] = { ...newItems[index], [field]: val };
+            return newItems;
+        });
     };
 
     const removeItem = (index: number) => {
@@ -97,9 +211,14 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
         setExtractedItems(newItems);
     };
 
+    const handleFinish = () => {
+        onImport(extractedItems);
+        onClose();
+    };
+
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
-            <div className="bg-slate-900 border border-slate-700 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-slate-900 border border-slate-700 w-full max-w-[95vw] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                 
                 {/* Header */}
                 <div className="bg-slate-800 p-6 border-b border-slate-700 flex justify-between items-center">
@@ -119,9 +238,8 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                     
                     {stage === 'UPLOAD' && (
                         <div className="flex flex-col items-center justify-center h-full space-y-8">
-                            
-                            {/* API Key Section */}
-                            <div className="w-full max-w-lg space-y-2">
+                             {/* API Key Section */}
+                             <div className="w-full max-w-lg space-y-2">
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Gemini API Key</label>
                                 <div className="flex gap-2">
                                     <input 
@@ -169,7 +287,6 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                                 }`}
                             >
                                 <span>Analyze with Gemini</span>
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                             </button>
                         </div>
                     )}
@@ -193,7 +310,7 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-lg font-bold text-white">Extracted {extractedItems.length} Items</h3>
                                 <div className="text-sm text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 flex items-center gap-2">
-                                    <span>✎ Review and edit values before importing</span>
+                                    <span>✎ Verify thumbnails and dimensions. Descriptions auto-update.</span>
                                 </div>
                             </div>
                             
@@ -201,20 +318,34 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                                 <table className="w-full text-sm text-left text-slate-300">
                                     <thead className="text-xs text-slate-400 uppercase bg-slate-900/50">
                                         <tr>
-                                            <th className="px-4 py-3 w-48">Type</th>
-                                            <th className="px-4 py-3 w-32">Tag</th>
-                                            <th className="px-4 py-3">Params (JSON)</th>
-                                            <th className="px-4 py-3 w-20">Qty</th>
-                                            <th className="px-4 py-3 w-16"></th>
+                                            <th className="px-4 py-3 w-16 text-center">Preview</th>
+                                            <th className="px-4 py-3 w-40">Type</th>
+                                            <th className="px-4 py-3 w-auto">Dimensions (mm/deg)</th>
+                                            <th className="px-4 py-3 w-48">Description (Auto)</th>
+                                            <th className="px-4 py-3 w-24">Tag</th>
+                                            <th className="px-4 py-3 w-16 text-center">Qty</th>
+                                            <th className="px-4 py-3 w-12"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-700">
-                                        {extractedItems.map((item, idx) => (
-                                            <tr key={idx} className="hover:bg-slate-700/50 transition-colors">
-                                                <td className="px-4 py-2">
+                                        {extractedItems.map((item, idx) => {
+                                            // Generate thumbnail on the fly
+                                            const thumbnailSvg = item.componentType ? generateDuctDrawing(item.componentType, item.params, null) : "";
+                                            
+                                            return (
+                                            <tr key={idx} className="hover:bg-slate-700/50 transition-colors group">
+                                                {/* Thumbnail */}
+                                                <td className="px-2 py-2">
+                                                    <div className="w-12 h-12 bg-white rounded border border-slate-500 overflow-hidden flex items-center justify-center p-0.5">
+                                                        <div dangerouslySetInnerHTML={{__html: thumbnailSvg}} className="w-full h-full" />
+                                                    </div>
+                                                </td>
+                                                
+                                                {/* Type Selector */}
+                                                <td className="px-4 py-2 align-top">
                                                     <select 
                                                         value={item.componentType} 
-                                                        onChange={(e) => handleUpdateItem(idx, 'componentType', e.target.value)}
+                                                        onChange={(e) => handleTypeChange(idx, e.target.value as ComponentType)}
                                                         className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs focus:border-blue-500 outline-none"
                                                     >
                                                         {Object.values(ComponentType).map(t => (
@@ -222,40 +353,57 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                                                         ))}
                                                     </select>
                                                 </td>
-                                                <td className="px-4 py-2">
+
+                                                {/* Dimension Inputs */}
+                                                <td className="px-4 py-2 align-top">
+                                                    {item.componentType && item.params && (
+                                                        <ParamEditor 
+                                                            type={item.componentType} 
+                                                            params={item.params} 
+                                                            onChange={(k, v) => handleParamChange(idx, k, v)} 
+                                                        />
+                                                    )}
+                                                </td>
+
+                                                {/* Computed Description */}
+                                                <td className="px-4 py-2 align-top">
+                                                    <div className="text-xs text-slate-400 italic bg-slate-900/50 p-1.5 rounded border border-slate-700/50 h-full">
+                                                        {item.description}
+                                                    </div>
+                                                </td>
+
+                                                {/* Tag */}
+                                                <td className="px-4 py-2 align-top">
                                                     <input 
                                                         type="text" 
                                                         value={item.tagNo || ''}
-                                                        onChange={(e) => handleUpdateItem(idx, 'tagNo', e.target.value)}
+                                                        onChange={(e) => handleMetaChange(idx, 'tagNo', e.target.value)}
                                                         className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs focus:border-blue-500 outline-none"
+                                                        placeholder="Tag..."
                                                     />
                                                 </td>
-                                                <td className="px-4 py-2">
-                                                    <textarea 
-                                                        value={item.paramStr}
-                                                        onChange={(e) => handleUpdateItem(idx, 'paramStr', e.target.value)}
-                                                        className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-blue-300 font-mono text-[10px] focus:border-blue-500 outline-none resize-y min-h-[40px]"
-                                                        spellCheck={false}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2">
+
+                                                {/* Qty */}
+                                                <td className="px-4 py-2 align-top">
                                                     <input 
                                                         type="number" 
                                                         value={item.qty}
-                                                        onChange={(e) => handleUpdateItem(idx, 'qty', parseInt(e.target.value) || 1)}
+                                                        onChange={(e) => handleMetaChange(idx, 'qty', parseInt(e.target.value) || 1)}
                                                         className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs focus:border-blue-500 outline-none text-center"
                                                     />
                                                 </td>
-                                                <td className="px-4 py-2 text-center">
+
+                                                {/* Delete */}
+                                                <td className="px-4 py-2 align-middle text-center">
                                                     <button 
                                                         onClick={() => removeItem(idx)}
-                                                        className="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-1.5 rounded transition-colors"
+                                                        className="text-slate-500 hover:text-red-400 transition-colors"
                                                     >
                                                         ✕
                                                     </button>
                                                 </td>
                                             </tr>
-                                        ))}
+                                        )})}
                                     </tbody>
                                 </table>
                             </div>

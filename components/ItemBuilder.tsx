@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ComponentType, DuctParams, OrderItem } from '../types';
 import { generateDuctDrawing } from '../services/geminiService';
+import { generateDescription } from '../services/descriptionService';
 import * as Inputs from './DuctInputs';
 import { NumInput, TextInput } from './InputFields';
 import { getFlangeParams } from '../services/flangeStandards';
@@ -14,7 +15,7 @@ interface ItemBuilderProps {
 }
 
 // Default Params Helper for Initialization and Thumbnails
-const getDefaultParams = (type: ComponentType): DuctParams => {
+export const getDefaultParams = (type: ComponentType): DuctParams => {
     switch (type) {
       case ComponentType.ELBOW: return { d1: 500, angle: 90, radius: 250, extension1: 0, extension2: 0 };
       case ComponentType.REDUCER: return { d1: 500, d2: 300, length: 300, extension1: 50, extension2: 50, reducerType: "Concentric" };
@@ -342,54 +343,9 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
   };
 
   const handleSave = async () => {
-    let description = componentType.split(' ')[0]; 
-    if (componentType === ComponentType.MANUAL) {
-        description = params.userDescription || "Manual Item";
-    } else if (componentType === ComponentType.STRAIGHT) {
-        description = "Straight Duct";
-    } else if (componentType === ComponentType.TRANSFORMATION) {
-        description = "Transformation Sq-Rd";
-        if (params.offset && params.offset !== 0) description += ` (Offset H=${params.offset})`;
-    } else if (componentType === ComponentType.VOLUME_DAMPER) {
-        description = `VCD (${params.actuation})`;
-    } else if (componentType === ComponentType.MULTIBLADE_DAMPER) {
-        description = `${params.bladeType} Multiblade Damper`;
-    } else if (componentType === ComponentType.STRAIGHT_WITH_TAPS) {
-        let desc = "Straight";
-        if (params.tapQty > 0) desc += ` w/ ${params.tapQty} Taps`;
-        if (params.nptQty > 0) desc += ` & ${params.nptQty} NPT`;
-        description = desc;
-    } else if (componentType === ComponentType.BLIND_PLATE) {
-        description = `Blind Plate Ø${params.d1}`;
-    } else if (componentType === ComponentType.BLAST_GATE_DAMPER) {
-        description = `Blast Gate Damper Ø${params.d1}`;
-    } else if (componentType === ComponentType.ANGLE_FLANGE) {
-        description = `Angle Flange Ø${params.d1}`;
-    } else if (componentType === ComponentType.TEE) {
-        description = `Tee Ø${params.main_d} / Ø${params.tap_d}`;
-    } else if (componentType === ComponentType.CROSS_TEE) {
-        description = `Cross Tee Ø${params.main_d} / Ø${params.tap_d}`;
-    } else if (componentType === ComponentType.LATERAL_TEE) {
-        description = `Lateral Tee (45°) Ø${params.d1} / Ø${params.d2}`;
-    } else if (componentType === ComponentType.BOOT_TEE) {
-        description = `Boot Tee Ø${params.d1} / Ø${params.d2}`;
-    } else if (componentType === ComponentType.OFFSET) {
-        if (params.d1 !== params.d2) {
-             description = `Reducing Offset Ø${params.d1}-Ø${params.d2} / L=${params.length} / H=${params.offset}`;
-        } else {
-             description = `Offset Ø${params.d1} / L=${params.length} / H=${params.offset}`;
-        }
-    } else if (componentType === ComponentType.ELBOW) {
-        description = `Elbow Ø${params.d1} / ${params.angle}° / R${params.radius}`;
-        if (params.extension1 > 0 || params.extension2 > 0) description += ` / Ext:${params.extension1 || 0}+${params.extension2 || 0}`;
-    } else if (componentType === ComponentType.REDUCER) {
-        const typeStr = params.reducerType === "Eccentric" ? "Eccentric Reducer" : "Reducer";
-        description = `${typeStr} Ø${params.d1} / Ø${params.d2} / L${params.length}`;
-        if (params.extension1 !== 50 || params.extension2 !== 50) description += ` / RC:${params.extension1}-${params.extension2}`;
-    } else if (componentType === ComponentType.SADDLE) {
-        description = `Saddle Tap Ø${params.d1} on Ø${params.d2} / L${params.length}`;
-    }
-
+    // Generate Description using shared service
+    const description = generateDescription(componentType, params);
+    
     onSave({ componentType, params, ...meta, description, sketchSvg: previewSvg });
     if (!editingItem) setMeta(prev => ({ ...prev, tagNo: "", qty: 1, notes: "" }));
   };
