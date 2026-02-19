@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { parseExcelWithGemini } from '../services/aiAgent';
 import { OrderItem, ComponentType } from '../types';
 
@@ -7,13 +8,25 @@ interface AiWizardProps {
     onImport: (items: any[]) => void;
 }
 
+interface EditableItem extends Partial<OrderItem> {
+    paramStr: string; // JSON string for editing params
+}
+
 type Stage = 'UPLOAD' | 'THINKING' | 'VERIFY';
 
 export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
     const [stage, setStage] = useState<Stage>('UPLOAD');
     const [file, setFile] = useState<File | null>(null);
-    const [extractedItems, setExtractedItems] = useState<Partial<OrderItem>[]>([]);
+    const [extractedItems, setExtractedItems] = useState<EditableItem[]>([]);
     const [error, setError] = useState<string>("");
+    
+    // API Key State - Persisted locally
+    const [apiKey, setApiKey] = useState(() => localStorage.getItem('acesian_gemini_key') || "");
+
+    const handleApiKeyChange = (val: string) => {
+        setApiKey(val);
+        localStorage.setItem('acesian_gemini_key', val);
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -24,15 +37,22 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
 
     const startProcessing = async () => {
         if (!file) return;
+        if (!apiKey.trim()) {
+            setError("Please enter a valid Gemini API Key.");
+            return;
+        }
 
         setStage('THINKING');
         try {
-            const items = await parseExcelWithGemini(file);
-            // Add temp IDs
-            const itemsWithIds = items.map((item, idx) => ({
+            const items = await parseExcelWithGemini(file, apiKey);
+            // Add temp IDs and prepare editable string for params
+            const itemsWithIds: EditableItem[] = items.map((item, idx) => ({
                 ...item,
                 id: `ai-${Date.now()}-${idx}`,
-                description: "AI Generated"
+                description: "AI Generated",
+                // Ensure params is an object before stringifying, defaulting to empty object
+                params: item.params || {},
+                paramStr: JSON.stringify(item.params || {})
             }));
             setExtractedItems(itemsWithIds);
             setStage('VERIFY');
@@ -43,8 +63,31 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
         }
     };
 
+    // --- Editing Handlers ---
+
+    const handleUpdateItem = (index: number, field: keyof EditableItem, value: any) => {
+        const newItems = [...extractedItems];
+        newItems[index] = { ...newItems[index], [field]: value };
+        setExtractedItems(newItems);
+    };
+
     const handleFinish = () => {
-        onImport(extractedItems);
+        // Validate and Parse JSON params before importing
+        const finalItems = [];
+        for (let i = 0; i < extractedItems.length; i++) {
+            const item = extractedItems[i];
+            try {
+                const parsedParams = JSON.parse(item.paramStr);
+                finalItems.push({
+                    ...item,
+                    params: parsedParams
+                });
+            } catch (e) {
+                alert(`Error in Row ${i + 1}: Invalid JSON in Params field.\n\nPlease fix the format before importing.`);
+                return;
+            }
+        }
+        onImport(finalItems);
         onClose();
     };
 
@@ -56,7 +99,7 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
-            <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-slate-900 border border-slate-700 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                 
                 {/* Header */}
                 <div className="bg-slate-800 p-6 border-b border-slate-700 flex justify-between items-center">
@@ -75,7 +118,25 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                 <div className="flex-1 overflow-y-auto p-8 relative">
                     
                     {stage === 'UPLOAD' && (
-                        <div className="flex flex-col items-center justify-center h-full space-y-6">
+                        <div className="flex flex-col items-center justify-center h-full space-y-8">
+                            
+                            {/* API Key Section */}
+                            <div className="w-full max-w-lg space-y-2">
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Gemini API Key</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="password" 
+                                        value={apiKey}
+                                        onChange={(e) => handleApiKeyChange(e.target.value)}
+                                        placeholder="Enter your API Key..."
+                                        className="flex-1 bg-slate-800 border border-slate-600 rounded px-4 py-3 text-white focus:border-blue-500 outline-none transition-colors"
+                                    />
+                                </div>
+                                <p className="text-xs text-slate-500">
+                                    Don't have a key? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Get a free API key here</a>.
+                                </p>
+                            </div>
+
                             <div className="w-full max-w-lg border-2 border-dashed border-slate-600 rounded-xl p-12 flex flex-col items-center justify-center bg-slate-800/50 hover:bg-slate-800 transition-colors group cursor-pointer relative">
                                 <input 
                                     type="file" 
@@ -131,8 +192,8 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                         <div className="space-y-4">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-lg font-bold text-white">Extracted {extractedItems.length} Items</h3>
-                                <div className="text-sm text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
-                                    Please verify dimensions before importing
+                                <div className="text-sm text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700 flex items-center gap-2">
+                                    <span>✎ Review and edit values before importing</span>
                                 </div>
                             </div>
                             
@@ -140,24 +201,52 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                                 <table className="w-full text-sm text-left text-slate-300">
                                     <thead className="text-xs text-slate-400 uppercase bg-slate-900/50">
                                         <tr>
-                                            <th className="px-4 py-3">Type</th>
-                                            <th className="px-4 py-3">Params</th>
+                                            <th className="px-4 py-3 w-48">Type</th>
+                                            <th className="px-4 py-3 w-32">Tag</th>
+                                            <th className="px-4 py-3">Params (JSON)</th>
                                             <th className="px-4 py-3 w-20">Qty</th>
-                                            <th className="px-4 py-3 w-20">Action</th>
+                                            <th className="px-4 py-3 w-16"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-700">
                                         {extractedItems.map((item, idx) => (
                                             <tr key={idx} className="hover:bg-slate-700/50 transition-colors">
-                                                <td className="px-4 py-3 font-medium text-white">
-                                                    {item.componentType?.split('(')[0]}
-                                                    <div className="text-xs text-slate-500 font-mono mt-0.5">{item.tagNo || '-'}</div>
+                                                <td className="px-4 py-2">
+                                                    <select 
+                                                        value={item.componentType} 
+                                                        onChange={(e) => handleUpdateItem(idx, 'componentType', e.target.value)}
+                                                        className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs focus:border-blue-500 outline-none"
+                                                    >
+                                                        {Object.values(ComponentType).map(t => (
+                                                            <option key={t} value={t}>{t.split('(')[0]}</option>
+                                                        ))}
+                                                    </select>
                                                 </td>
-                                                <td className="px-4 py-3 font-mono text-xs text-blue-300">
-                                                    {JSON.stringify(item.params).replace(/"/g, '').replace(/,/g, ', ')}
+                                                <td className="px-4 py-2">
+                                                    <input 
+                                                        type="text" 
+                                                        value={item.tagNo || ''}
+                                                        onChange={(e) => handleUpdateItem(idx, 'tagNo', e.target.value)}
+                                                        className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs focus:border-blue-500 outline-none"
+                                                    />
                                                 </td>
-                                                <td className="px-4 py-3">{item.qty}</td>
-                                                <td className="px-4 py-3">
+                                                <td className="px-4 py-2">
+                                                    <textarea 
+                                                        value={item.paramStr}
+                                                        onChange={(e) => handleUpdateItem(idx, 'paramStr', e.target.value)}
+                                                        className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-blue-300 font-mono text-[10px] focus:border-blue-500 outline-none resize-y min-h-[40px]"
+                                                        spellCheck={false}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <input 
+                                                        type="number" 
+                                                        value={item.qty}
+                                                        onChange={(e) => handleUpdateItem(idx, 'qty', parseInt(e.target.value) || 1)}
+                                                        className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs focus:border-blue-500 outline-none text-center"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2 text-center">
                                                     <button 
                                                         onClick={() => removeItem(idx)}
                                                         className="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-1.5 rounded transition-colors"

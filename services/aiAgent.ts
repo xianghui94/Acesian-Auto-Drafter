@@ -1,4 +1,5 @@
-import { GoogleGenAI } from "@google/generative-ai";
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import readXlsxFile from 'read-excel-file';
 import { ComponentType, OrderItem } from "../types";
 
@@ -36,7 +37,7 @@ Example Output Format:
 }
 `;
 
-export const parseExcelWithGemini = async (file: File): Promise<Partial<OrderItem>[]> => {
+export const parseExcelWithGemini = async (file: File, apiKey: string): Promise<Partial<OrderItem>[]> => {
     try {
         // 1. Read Excel File
         const rows = await readXlsxFile(file);
@@ -44,11 +45,11 @@ export const parseExcelWithGemini = async (file: File): Promise<Partial<OrderIte
         // Convert to simple CSV-like string for token efficiency
         const csvContent = rows.map(row => row.join(" | ")).join("\n");
 
-        // 2. Initialize Gemini with Environment Variable
-        const key = apiKey || import.meta.env.VITE_GEMINI_API_KEY || "";
-        const genAI = new GoogleGenerativeAI(key);
+        // 2. Initialize Gemini
+        if (!apiKey) throw new Error("API Key is required");
+        const genAI = new GoogleGenerativeAI(apiKey);
         
-        // 3. 修复的地方在这里：注意括号里面是干净的属性，没有奇怪的分号
+        // 3. Configure Model
         const model = genAI.getGenerativeModel({ 
             model: "gemini-2.5-flash", 
             systemInstruction: SYSTEM_INSTRUCTION,
@@ -57,8 +58,12 @@ export const parseExcelWithGemini = async (file: File): Promise<Partial<OrderIte
             }
         });
 
-        // 4. Parse Response
-        const responseText = response.text;
+        // 4. Call API
+        const prompt = `Here is the BOM data:\n${csvContent}`;
+        const result = await model.generateContent(prompt);
+
+        // 5. Parse Response
+        const responseText = result.response.text();
         if (!responseText) throw new Error("Empty response from AI");
 
         const parsed = JSON.parse(responseText);
