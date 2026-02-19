@@ -1,3 +1,4 @@
+
 import { DuctParams } from "../../types";
 import { createSvg, drawDim, drawFlange, drawAnnotation, VIEW_BOX_SIZE, CFG } from "../svgUtils";
 
@@ -184,22 +185,53 @@ const drawFeatureSideView = (cx: number, cy: number, f: FeaturePoint, pipeRad: n
     }
     
     const rad = (angleDeg - 90) * Math.PI / 180;
-    const rStart = pipeRad;
-    const rEnd = pipeRad + f.stickOut;
+    
+    // Calculate Tap Geometry
+    const hw = f.diameter / 2;
+    // Calculate radial distance to intersection point on circle surface (chord logic)
+    // rIntersect^2 + hw^2 = pipeRad^2  => rIntersect = sqrt(pipeRad^2 - hw^2)
+    // Clamp hw to avoid sqrt of negative if tap >= pipe (geometric limit)
+    const safeHw = Math.min(hw, pipeRad - 0.5);
+    const rIntersect = Math.sqrt(pipeRad * pipeRad - safeHw * safeHw);
+    
+    const rStart = rIntersect; // Base of tap sits on intersection line
+    const rEnd = pipeRad + f.stickOut; // Outer edge relative to theoretical center surface
 
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
 
     const pCos = Math.cos(rad + Math.PI/2);
     const pSin = Math.sin(rad + Math.PI/2);
-    const hw = f.diameter / 2;
 
-    const p1 = { x: cx + rStart*cos + hw*pCos, y: cy + rStart*sin + hw*pSin };
-    const p2 = { x: cx + rEnd*cos + hw*pCos,   y: cy + rEnd*sin + hw*pSin };
-    const p3 = { x: cx + rEnd*cos - hw*pCos,   y: cy + rEnd*sin - hw*pSin };
-    const p4 = { x: cx + rStart*cos - hw*pCos, y: cy + rStart*sin - hw*pSin };
+    // Points: 
+    // p1 (Base Left), p2 (Top Left), p3 (Top Right), p4 (Base Right)
+    const p1 = { x: cx + rStart*cos + safeHw*pCos, y: cy + rStart*sin + safeHw*pSin };
+    const p2 = { x: cx + rEnd*cos + safeHw*pCos,   y: cy + rEnd*sin + safeHw*pSin };
+    const p3 = { x: cx + rEnd*cos - safeHw*pCos,   y: cy + rEnd*sin - safeHw*pSin };
+    const p4 = { x: cx + rStart*cos - safeHw*pCos, y: cy + rStart*sin - safeHw*pSin };
 
-    svg += `<path d="M${p1.x},${p1.y} L${p2.x},${p2.y} L${p3.x},${p3.y} L${p4.x},${p4.y} Z" class="line ${activeClass}" fill="white" />`;
+    // Path construction:
+    // M p1 L p2 L p3 L p4 (Trapezoid/Rectangle)
+    // Then Arc back to p1 to conform to cylinder surface
+    // The arc is A rx ry rot large_arc sweep end_x end_y
+    // Radius is pipeRad.
+    // Direction: p4 -> p1.
+    // If angleDeg=0 (Top): p4 is Right, p1 is Left. Arc goes p4->p1 counter-clockwise around center?
+    // Let's check logic:
+    // angle=0 -> rad=-90. cos=0, sin=-1. pCos=1, pSin=0.
+    // p1 = (cx + hw, cy - rStart). Right side of top.
+    // p4 = (cx - hw, cy - rStart). Left side of top.
+    // Wait, p1 uses +pCos. If pCos=1, p1.x > cx. So p1 is Right.
+    // p4 uses -pCos. p4.x < cx. So p4 is Left.
+    // Path: p1 (Right) -> p2 (Right Top) -> p3 (Left Top) -> p4 (Left Base).
+    // Close: p4 -> p1.
+    // This goes Left -> Right.
+    // The main circle goes Clockwise visually? Standard SVG circle is drawn 0->360.
+    // On Top (y < cy), the circle arc goes Left -> Right.
+    // So p4 -> p1 follows the circle arc direction if we use sweep=1?
+    // Let's try sweep 1.
+    
+    svg += `<path d="M${p1.x},${p1.y} L${p2.x},${p2.y} L${p3.x},${p3.y} L${p4.x},${p4.y} A${pipeRad},${pipeRad} 0 0,1 ${p1.x},${p1.y} Z" class="line ${activeClass}" fill="white" />`;
 
     if (f.type === 'tap') {
         const fh = 5;

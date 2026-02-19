@@ -216,150 +216,159 @@ export const StraightWithTapsInputs: React.FC<InputProps> = ({
     onBlur
 }) => (
     <>
-        <NumInput label="Main D" fieldId="d1" value={params.d1} onChange={v => onChange('d1', v)} onFocus={onFocus} onBlur={onBlur} />
-        <NumInput label="Total L" fieldId="length" value={params.length} onChange={v => onChange('length', v)} onFocus={onFocus} onBlur={onBlur} />
-        
-        <div className="flex gap-2">
-            <NumInput label="Qty Taps" value={params.tapQty || 0} onChange={onTapQtyChange!} />
-            <NumInput label="Qty NPT" value={params.nptQty || 0} onChange={onNptQtyChange!} />
+        {/* Compact Top Grid */}
+        <div className="col-span-2 md:col-span-4 lg:col-span-6 grid grid-cols-2 md:grid-cols-6 gap-3 mb-2">
+            <div className="md:col-span-1">
+                <NumInput label="Main D" fieldId="d1" value={params.d1} onChange={v => onChange('d1', v)} onFocus={onFocus} onBlur={onBlur} />
+            </div>
+            <div className="md:col-span-1">
+                <NumInput label="Total L" fieldId="length" value={params.length} onChange={v => onChange('length', v)} onFocus={onFocus} onBlur={onBlur} />
+            </div>
+            <div className="md:col-span-1">
+                <NumInput label="Qty Taps" value={params.tapQty || 0} onChange={onTapQtyChange!} step={1} />
+            </div>
+            <div className="md:col-span-1">
+                <NumInput label="Qty NPT" value={params.nptQty || 0} onChange={onNptQtyChange!} step={1} />
+            </div>
+            <div className="md:col-span-1">
+                <SelectInput 
+                    label="Seam Pos" 
+                    value={params.seamAngle !== undefined ? params.seamAngle : 0} 
+                    options={[0, 45, 90, 135, 180, 225, 270, 315]} 
+                    onChange={v => onChange('seamAngle', Number(v))} 
+                />
+            </div>
         </div>
         
-        <SelectInput 
-            label="Seam Pos" 
-            value={params.seamAngle !== undefined ? params.seamAngle : 0} 
-            options={[0, 45, 90, 135, 180, 225, 270, 315]} 
-            onChange={v => onChange('seamAngle', Number(v))} 
-        />
-        
         {/* Flange Remarks */}
-        <div className="col-span-2 grid grid-cols-2 gap-4 border-t border-cad-200 pt-2 mt-2">
+        <div className="col-span-2 md:col-span-4 lg:col-span-6 grid grid-cols-2 gap-4 border-t border-cad-200 pt-3 mt-1 pb-3">
             <TextAreaInput label="Flange 1 Remark (Left)" value={params.flangeRemark1 || ""} onChange={v => onChange('flangeRemark1', v)} onFocus={onFocus} onBlur={onBlur} />
             <TextAreaInput label="Flange 2 Remark (Right)" value={params.flangeRemark2 || ""} onChange={v => onChange('flangeRemark2', v)} onFocus={onFocus} onBlur={onBlur} />
         </div>
 
         {/* Taps Config */}
-        <div className="col-span-2 md:col-span-4 lg:col-span-6 mt-2">
-            <div className="bg-cad-50 border border-cad-200 rounded p-2">
-            <label className="block text-xs font-bold text-cad-500 mb-2 uppercase tracking-wide">Tap Configuration</label>
-            {params.tapQty > 0 ? (
-                <>
-                    <div className="grid grid-cols-12 gap-2 mb-1 text-[10px] font-bold text-cad-400 px-1">
-                        <div className="col-span-1 text-center">#</div>
-                        <div className="col-span-2">Dist</div>
-                        <div className="col-span-2">Diam</div>
-                        <div className="col-span-2">Angle</div>
-                        <div className="col-span-5">Remark</div>
-                    </div>
-                    {params.taps && params.taps.map((tap: any, idx: number) => (
-                        <div key={idx} className="grid grid-cols-12 gap-2 mb-2 items-start">
-                            <div className="col-span-1 text-xs font-mono font-bold text-center bg-cad-200 rounded py-1">{idx + 1}</div>
-                            <input 
-                                id={`taps-dist-${idx}`}
-                                type="number" 
-                                value={tap.dist} 
-                                onChange={(e) => onTapUpdate!(idx, 'dist', Number(e.target.value))}
-                                onFocus={() => onFocus && onFocus(`taps-dist-${idx}`)}
-                                onBlur={onBlur}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
-                                placeholder="Dist"
-                            />
-                            <input 
-                                id={`taps-diameter-${idx}`}
-                                type="number" 
-                                value={tap.diameter} 
-                                onChange={(e) => onTapUpdate!(idx, 'diameter', Number(e.target.value))}
-                                onFocus={() => onFocus && onFocus(`taps-diameter-${idx}`)}
-                                onBlur={onBlur}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
-                                placeholder="Dia"
-                            />
-                                <input 
-                                id={`taps-angle-${idx}`}
-                                type="number" 
-                                value={tap.angle} 
-                                onChange={(e) => onTapUpdate!(idx, 'angle', Number(e.target.value))}
-                                onFocus={() => onFocus && onFocus(`taps-angle-${idx}`)}
-                                onBlur={onBlur}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
-                                placeholder="0"
-                            />
-                            <textarea
-                                value={tap.remark || ""} 
-                                onChange={(e) => onTapUpdate!(idx, 'remark', e.target.value)}
-                                className="col-span-5 p-1 border border-cad-300 rounded text-xs w-full resize-y font-sans leading-tight focus:border-blue-500 outline-none"
-                                placeholder="Optional..."
-                                rows={2}
-                                style={{ minHeight: '32px' }}
-                            />
+        <div className="col-span-2 md:col-span-4 lg:col-span-6">
+            <div className="bg-white border border-cad-300 rounded overflow-hidden">
+                <div className="bg-cad-50 px-3 py-2 border-b border-cad-200 flex justify-between items-center">
+                    <label className="text-xs font-bold text-cad-700 uppercase tracking-wide">Tap Configuration</label>
+                    <span className="text-[10px] text-cad-400 font-medium">Qty: {params.tapQty}</span>
+                </div>
+                
+                {params.tapQty > 0 ? (
+                    <div className="p-2">
+                        <div className="grid grid-cols-12 gap-2 mb-1 text-[10px] font-bold text-cad-500 uppercase px-1">
+                            <div className="col-span-1 text-center">#</div>
+                            <div className="col-span-2">Dist</div>
+                            <div className="col-span-2">Dia</div>
+                            <div className="col-span-2">Angle</div>
+                            <div className="col-span-5">Remark</div>
                         </div>
-                    ))}
-                </>
-            ) : (
-                <div className="text-xs text-cad-400 italic p-2 text-center">No taps configured.</div>
-            )}
+                        {params.taps && params.taps.map((tap: any, idx: number) => (
+                            <div key={idx} className="grid grid-cols-12 gap-2 mb-1.5 items-center">
+                                <div className="col-span-1 text-xs font-mono font-bold text-center text-cad-400">{idx + 1}</div>
+                                <input 
+                                    id={`taps-dist-${idx}`}
+                                    type="number" 
+                                    value={tap.dist} 
+                                    onChange={(e) => onTapUpdate!(idx, 'dist', Number(e.target.value))}
+                                    onFocus={() => onFocus && onFocus(`taps-dist-${idx}`)}
+                                    onBlur={onBlur}
+                                    className="col-span-2 h-7 px-2 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
+                                />
+                                <input 
+                                    id={`taps-diameter-${idx}`}
+                                    type="number" 
+                                    value={tap.diameter} 
+                                    onChange={(e) => onTapUpdate!(idx, 'diameter', Number(e.target.value))}
+                                    onFocus={() => onFocus && onFocus(`taps-diameter-${idx}`)}
+                                    onBlur={onBlur}
+                                    className="col-span-2 h-7 px-2 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
+                                />
+                                <input 
+                                    id={`taps-angle-${idx}`}
+                                    type="number" 
+                                    value={tap.angle} 
+                                    onChange={(e) => onTapUpdate!(idx, 'angle', Number(e.target.value))}
+                                    onFocus={() => onFocus && onFocus(`taps-angle-${idx}`)}
+                                    onBlur={onBlur}
+                                    className="col-span-2 h-7 px-2 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
+                                />
+                                <input
+                                    type="text"
+                                    value={tap.remark || ""} 
+                                    onChange={(e) => onTapUpdate!(idx, 'remark', e.target.value)}
+                                    className="col-span-5 h-7 px-2 border border-cad-300 rounded text-xs w-full font-sans focus:border-blue-500 outline-none"
+                                    placeholder="Optional..."
+                                />
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-xs text-cad-400 italic p-4 text-center">No taps configured. Increase Qty to add.</div>
+                )}
             </div>
         </div>
 
         {/* NPT Config */}
-        <div className="col-span-2 md:col-span-4 lg:col-span-6 mt-2">
-            <div className="bg-cad-50 border border-cad-200 rounded p-2">
-            <label className="block text-xs font-bold text-cad-500 mb-2 uppercase tracking-wide">NPT Configuration</label>
-            {params.nptQty > 0 ? (
-                <>
-                    <div className="grid grid-cols-12 gap-2 mb-1 text-[10px] font-bold text-cad-400 px-1">
-                        <div className="col-span-1 text-center">#</div>
-                        <div className="col-span-2">Dist</div>
-                        <div className="col-span-2">Size</div>
-                        <div className="col-span-2">Angle</div>
-                        <div className="col-span-5">Remark</div>
-                    </div>
-                    {params.nptPorts && params.nptPorts.map((npt: any, idx: number) => (
-                        <div key={idx} className="grid grid-cols-12 gap-2 mb-2 items-start">
-                            <div className="col-span-1 text-xs font-mono font-bold text-center bg-cad-200 rounded py-1">{idx + 1}</div>
-                            <input 
-                                id={`npt-dist-${idx}`}
-                                type="number" 
-                                value={npt.dist} 
-                                onChange={(e) => onNptUpdate!(idx, 'dist', Number(e.target.value))}
-                                onFocus={() => onFocus && onFocus(`npt-dist-${idx}`)}
-                                onBlur={onBlur}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
-                                placeholder="Dist"
-                            />
-                            <input 
-                                id={`npt-size-${idx}`}
-                                type="text" 
-                                value={npt.size} 
-                                onChange={(e) => onNptUpdate!(idx, 'size', e.target.value)}
-                                onFocus={() => onFocus && onFocus(`npt-size-${idx}`)}
-                                onBlur={onBlur}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
-                                placeholder='Size'
-                            />
-                            <input 
-                                id={`npt-angle-${idx}`}
-                                type="number" 
-                                value={npt.angle} 
-                                onChange={(e) => onNptUpdate!(idx, 'angle', Number(e.target.value))}
-                                onFocus={() => onFocus && onFocus(`npt-angle-${idx}`)}
-                                onBlur={onBlur}
-                                className="col-span-2 p-1 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
-                                placeholder="0"
-                            />
-                            <textarea
-                                value={npt.remark || ""} 
-                                onChange={(e) => onNptUpdate!(idx, 'remark', e.target.value)}
-                                className="col-span-5 p-1 border border-cad-300 rounded text-xs w-full resize-y font-sans leading-tight focus:border-blue-500 outline-none"
-                                placeholder="Optional..."
-                                rows={2}
-                                style={{ minHeight: '32px' }}
-                            />
+        <div className="col-span-2 md:col-span-4 lg:col-span-6 mt-4">
+            <div className="bg-white border border-cad-300 rounded overflow-hidden">
+                <div className="bg-cad-50 px-3 py-2 border-b border-cad-200 flex justify-between items-center">
+                    <label className="text-xs font-bold text-cad-700 uppercase tracking-wide">NPT Configuration</label>
+                    <span className="text-[10px] text-cad-400 font-medium">Qty: {params.nptQty}</span>
+                </div>
+                
+                {params.nptQty > 0 ? (
+                    <div className="p-2">
+                        <div className="grid grid-cols-12 gap-2 mb-1 text-[10px] font-bold text-cad-500 uppercase px-1">
+                            <div className="col-span-1 text-center">#</div>
+                            <div className="col-span-2">Dist</div>
+                            <div className="col-span-2">Size</div>
+                            <div className="col-span-2">Angle</div>
+                            <div className="col-span-5">Remark</div>
                         </div>
-                    ))}
-                </>
-            ) : (
-                <div className="text-xs text-cad-400 italic p-2 text-center">No NPT ports configured.</div>
-            )}
+                        {params.nptPorts && params.nptPorts.map((npt: any, idx: number) => (
+                            <div key={idx} className="grid grid-cols-12 gap-2 mb-1.5 items-center">
+                                <div className="col-span-1 text-xs font-mono font-bold text-center text-cad-400">{idx + 1}</div>
+                                <input 
+                                    id={`npt-dist-${idx}`}
+                                    type="number" 
+                                    value={npt.dist} 
+                                    onChange={(e) => onNptUpdate!(idx, 'dist', Number(e.target.value))}
+                                    onFocus={() => onFocus && onFocus(`npt-dist-${idx}`)}
+                                    onBlur={onBlur}
+                                    className="col-span-2 h-7 px-2 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
+                                />
+                                <input 
+                                    id={`npt-size-${idx}`}
+                                    type="text" 
+                                    value={npt.size} 
+                                    onChange={(e) => onNptUpdate!(idx, 'size', e.target.value)}
+                                    onFocus={() => onFocus && onFocus(`npt-size-${idx}`)}
+                                    onBlur={onBlur}
+                                    className="col-span-2 h-7 px-2 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
+                                />
+                                <input 
+                                    id={`npt-angle-${idx}`}
+                                    type="number" 
+                                    value={npt.angle} 
+                                    onChange={(e) => onNptUpdate!(idx, 'angle', Number(e.target.value))}
+                                    onFocus={() => onFocus && onFocus(`npt-angle-${idx}`)}
+                                    onBlur={onBlur}
+                                    className="col-span-2 h-7 px-2 border border-cad-300 rounded text-xs font-mono w-full focus:border-blue-500 outline-none"
+                                />
+                                <input
+                                    type="text"
+                                    value={npt.remark || ""} 
+                                    onChange={(e) => onNptUpdate!(idx, 'remark', e.target.value)}
+                                    className="col-span-5 h-7 px-2 border border-cad-300 rounded text-xs w-full font-sans focus:border-blue-500 outline-none"
+                                    placeholder="Optional..."
+                                />
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-xs text-cad-400 italic p-4 text-center">No NPT ports configured.</div>
+                )}
             </div>
         </div>
     </>
