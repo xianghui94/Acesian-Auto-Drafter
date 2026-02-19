@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { OrderHeader, OrderItem } from '../types';
+import { calculateOrderTotals } from '../services/calculators';
 
 interface OrderSheetProps {
   header: OrderHeader;
@@ -10,12 +11,26 @@ interface OrderSheetProps {
   onInsertBefore: (index: number) => void;
   onDuplicateItem: (item: OrderItem) => void;
   onMoveItem: (index: number, direction: 'up' | 'down') => void;
+  showSummary?: boolean;
+  printSummary?: boolean;
 }
 
 const ITEMS_PER_PAGE = 6;
 
-export const OrderSheet: React.FC<OrderSheetProps> = ({ header, items, onRemoveItem, onEditItem, onInsertBefore, onDuplicateItem, onMoveItem }) => {
+export const OrderSheet: React.FC<OrderSheetProps> = ({ 
+    header, 
+    items, 
+    onRemoveItem, 
+    onEditItem, 
+    onInsertBefore, 
+    onDuplicateItem, 
+    onMoveItem,
+    showSummary = false,
+    printSummary = false
+}) => {
   
+  const totals = useMemo(() => calculateOrderTotals(items), [items]);
+
   if (items.length === 0) {
       return (
           <div className="flex flex-col items-center justify-center p-12 bg-white rounded-lg shadow-sm border border-cad-200 text-center max-w-2xl mx-auto mt-8">
@@ -55,6 +70,68 @@ export const OrderSheet: React.FC<OrderSheetProps> = ({ header, items, onRemoveI
                 />
             </div>
         ))}
+
+        {/* Summary Page */}
+        {showSummary && (
+            <div className={`w-full max-w-[210mm] ${printSummary ? 'print:block' : 'print:hidden'}`}>
+                <div className="a4-page bg-white p-10 flex flex-col">
+                    <div className="border-b-2 border-cad-900 pb-4 mb-6">
+                        <h1 className="text-2xl font-bold text-cad-900">Estimation Summary</h1>
+                        <div className="flex justify-between mt-2 text-sm text-cad-600">
+                            <span>Project: <span className="font-bold text-cad-800">{header.project || 'N/A'}</span></span>
+                            <span>OS No: <span className="font-bold text-cad-800">{header.osNo || 'N/A'}</span></span>
+                            <span>Date: <span className="font-bold text-cad-800">{header.date}</span></span>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-cad-50 text-cad-900 uppercase text-xs font-bold">
+                                <tr>
+                                    <th className="px-4 py-2 border-b border-cad-200">#</th>
+                                    <th className="px-4 py-2 border-b border-cad-200">Description</th>
+                                    <th className="px-4 py-2 border-b border-cad-200">Material</th>
+                                    <th className="px-4 py-2 border-b border-cad-200">Thk</th>
+                                    <th className="px-4 py-2 border-b border-cad-200 text-right">Qty</th>
+                                    <th className="px-4 py-2 border-b border-cad-200 text-right">Est. Area (m²)</th>
+                                    <th className="px-4 py-2 border-b border-cad-200 text-right">Est. Weight (kg)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-cad-100">
+                                {totals.itemDetails.map((item, idx) => (
+                                    <tr key={item.id} className="hover:bg-cad-50">
+                                        <td className="px-4 py-2 text-cad-500 font-mono">{idx + 1}</td>
+                                        <td className="px-4 py-2 font-medium">{item.description}</td>
+                                        <td className="px-4 py-2">{item.material}</td>
+                                        <td className="px-4 py-2">{item.thickness}</td>
+                                        <td className="px-4 py-2 text-right">{item.qty}</td>
+                                        <td className="px-4 py-2 text-right font-mono text-cad-600">{item.stats.area.toFixed(2)}</td>
+                                        <td className="px-4 py-2 text-right font-mono text-cad-600">{item.stats.weight.toFixed(2)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="mt-8 border-t-2 border-cad-900 pt-4 flex justify-end">
+                        <div className="w-64 bg-cad-50 p-4 rounded border border-cad-200">
+                            <div className="flex justify-between mb-2">
+                                <span className="font-bold text-cad-600">Total Area:</span>
+                                <span className="font-mono font-bold text-lg">{totals.totalArea} m²</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="font-bold text-cad-600">Total Weight:</span>
+                                <span className="font-mono font-bold text-lg">{totals.totalWeight} kg</span>
+                            </div>
+                            <div className="mt-2 text-[10px] text-cad-400 italic text-right border-t border-cad-200 pt-1">
+                                * Estimations based on geometric approximation.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         </div>
 
         {/* Mini Map (Table of Contents) - Only visible on large screens */}

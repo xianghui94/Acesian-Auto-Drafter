@@ -1,11 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { OrderHeader } from '../types';
 
 interface SidebarProps {
   header: OrderHeader;
   onChange: (field: keyof OrderHeader, value: string) => void;
   onBulkChange: (updates: Partial<OrderHeader>) => void;
+  onSaveProject: () => void;
+  onLoadProject: (file: File) => void;
 }
 
 interface SavedProfile {
@@ -14,8 +16,9 @@ interface SavedProfile {
     data: Partial<OrderHeader>;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ header, onChange, onBulkChange }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ header, onChange, onBulkChange, onSaveProject, onLoadProject }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Address Book State
   const [showAddressBook, setShowAddressBook] = useState(false);
@@ -76,6 +79,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ header, onChange, onBulkChange
       }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+          onLoadProject(e.target.files[0]);
+          e.target.value = ""; // Reset
+      }
+  };
+
   return (
     <aside className={`no-print bg-white border-r border-cad-200 flex flex-col h-full shadow-lg z-10 transition-all duration-300 ease-in-out ${isCollapsed ? 'w-12' : 'w-full md:w-80'}`}>
       
@@ -97,7 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ header, onChange, onBulkChange
 
       <div className={`flex flex-col h-full overflow-y-auto ${isCollapsed ? 'hidden' : 'block'}`}>
           <div className="p-6 border-b border-cad-200 bg-cad-50">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
                 <h1 className="text-xl font-bold text-cad-800 flex items-center gap-2">
                 <span className="text-2xl">📝</span> Order Setup
                 </h1>
@@ -109,7 +119,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ header, onChange, onBulkChange
                     <span>📒</span> Book
                 </button>
             </div>
-            <p className="text-xs text-cad-500 mt-1 uppercase tracking-wider font-semibold">Header Information</p>
+            
+            {/* Project File Actions */}
+            <div className="flex gap-2 mb-2">
+                <button 
+                    onClick={onSaveProject}
+                    className="flex-1 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 py-2 rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                >
+                    <span>💾</span> Save Project
+                </button>
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 py-2 rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                >
+                    <span>📂</span> Load Project
+                </button>
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    accept=".json" 
+                    className="hidden" 
+                />
+            </div>
           </div>
 
           <div className="p-6 space-y-4">

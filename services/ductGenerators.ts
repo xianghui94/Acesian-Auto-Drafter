@@ -3,6 +3,7 @@ export * from './generators/straight';
 export * from './generators/reducer';
 export * from './generators/elbow';
 export * from './generators/tee';
+export * from './generators/crossTee';
 export * from './generators/lateralTee';
 export * from './generators/bootTee';
 export * from './generators/transformation';

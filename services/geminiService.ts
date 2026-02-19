@@ -5,6 +5,7 @@ import {
     generateReducer, 
     generateStraight, 
     generateTee, 
+    generateCrossTee,
     generateLateralTee,
     generateBootTee,
     generateTransformation, 
@@ -30,6 +31,7 @@ export const generateDuctDrawing = (type: ComponentType, params: DuctParams, act
         case ComponentType.REDUCER: return generateReducer(params, activeField);
         case ComponentType.STRAIGHT: return generateStraight(params, activeField);
         case ComponentType.TEE: return generateTee(params, activeField);
+        case ComponentType.CROSS_TEE: return generateCrossTee(params, activeField);
         case ComponentType.LATERAL_TEE: return generateLateralTee(params, activeField);
         case ComponentType.BOOT_TEE: return generateBootTee(params, activeField);
         case ComponentType.TRANSFORMATION: return generateTransformation(params, activeField);

@@ -4,6 +4,7 @@ export enum ComponentType {
   REDUCER = "Reducer (变径)",
   STRAIGHT = "Straight (直管)",
   TEE = "Tee (三通)",
+  CROSS_TEE = "Cross Tee (四通)",
   LATERAL_TEE = "Lateral Tee (45° 斜三通)",
   BOOT_TEE = "Boot Tee (靴形三通)",
   TRANSFORMATION = "Transformation (Square to Round)",
@@ -52,6 +53,13 @@ export interface OrderItem {
   sketchSvg?: string | null; // The Gemini generated SVG
   componentType: ComponentType;
   params: DuctParams;
+}
+
+export interface SavedProject {
+  version: string;
+  timestamp: number;
+  header: OrderHeader;
+  items: OrderItem[];
 }
 
 // Ensure process.env.API_KEY is typed

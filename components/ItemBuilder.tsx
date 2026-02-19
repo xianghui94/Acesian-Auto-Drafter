@@ -20,6 +20,7 @@ const getDefaultParams = (type: ComponentType): DuctParams => {
       case ComponentType.REDUCER: return { d1: 500, d2: 300, length: 300, extension1: 50, extension2: 50, reducerType: "Concentric" };
       case ComponentType.STRAIGHT: return { d1: 300, length: 1200 };
       case ComponentType.TEE: return { main_d: 500, tap_d: 300, length: 500, branch_l: 100 };
+      case ComponentType.CROSS_TEE: return { main_d: 500, tap_d: 300, length: 500, branch_l: 100 };
       // Lateral Tee: Default derived from (300*1.414) + 100 + 100 = ~624
       // Branch L default: (300 * 1.414) + 200 = ~624
       case ComponentType.LATERAL_TEE: {
@@ -194,7 +195,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         }
     }
     // Multiblade Length is now freely editable, no auto-reset
-    if (componentType === ComponentType.TEE && key === 'tap_d') {
+    if ((componentType === ComponentType.TEE || componentType === ComponentType.CROSS_TEE) && key === 'tap_d') {
         if (shouldAutoCalc('length')) {
             newParams.length = Number(val) + 200;
         }
@@ -366,6 +367,8 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         description = `Angle Flange Ø${params.d1}`;
     } else if (componentType === ComponentType.TEE) {
         description = `Tee Ø${params.main_d} / Ø${params.tap_d}`;
+    } else if (componentType === ComponentType.CROSS_TEE) {
+        description = `Cross Tee Ø${params.main_d} / Ø${params.tap_d}`;
     } else if (componentType === ComponentType.LATERAL_TEE) {
         description = `Lateral Tee (45°) Ø${params.d1} / Ø${params.d2}`;
     } else if (componentType === ComponentType.BOOT_TEE) {
@@ -404,6 +407,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
       case ComponentType.REDUCER: return <Inputs.ReducerInputs {...inputProps} />;
       case ComponentType.STRAIGHT: return <Inputs.StraightInputs {...inputProps} />;
       case ComponentType.TEE: return <Inputs.TeeInputs {...inputProps} />;
+      case ComponentType.CROSS_TEE: return <Inputs.CrossTeeInputs {...inputProps} />;
       case ComponentType.LATERAL_TEE: return <Inputs.LateralTeeInputs {...inputProps} />;
       case ComponentType.BOOT_TEE: return <Inputs.BootTeeInputs {...inputProps} />;
       case ComponentType.TRANSFORMATION: return <Inputs.TransformationInputs {...inputProps} />;

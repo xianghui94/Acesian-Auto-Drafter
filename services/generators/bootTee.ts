@@ -160,6 +160,14 @@ export const generateBootTee = (params: DuctParams, activeField: string | null =
     let remarks = "";
     if (params.flangeRemark1) remarks += drawAnnotation(xLeft, yTop, params.flangeRemark1, true, false, 80).svg;
     if (params.flangeRemark2) remarks += drawAnnotation(xRight, yTop, params.flangeRemark2, true, true, 80).svg;
+    
+    // Add Remark 3 for Branch
+    // Center of branch top is ( (xBootTopStart + xBootTopEnd) / 2, yCollarTop )
+    if (params.flangeRemark3) {
+        const cxBranch = (xBootTopStart + xBootTopEnd) / 2;
+        // Go Up and Right
+        remarks += drawAnnotation(cxBranch, yCollarTop, params.flangeRemark3, true, true, 80).svg;
+    }
 
     return createSvg(
         `<path d="${bodyPath} ${bootPath} ${collarPath}" class="line" fill="none" />` + 
