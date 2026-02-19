@@ -45,15 +45,14 @@ export const parseExcelWithGemini = async (file: File): Promise<Partial<OrderIte
         const csvContent = rows.map(row => row.join(" | ")).join("\n");
 
         // 2. Initialize Gemini with Environment Variable
-        const model = genAI.getGenerativeModel({;
+        const key = apiKey || import.meta.env.VITE_GEMINI_API_KEY || "";
+        const genAI = new GoogleGenerativeAI(key);
         
-        // 3. Call API with 3-flash-preview (recommended for text tasks)
-        const prompt = `Here is the BOM data:\n${csvContent}`;
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: prompt,
-            config: {
-                systemInstruction: SYSTEM_INSTRUCTION,
+        // 3. 修复的地方在这里：注意括号里面是干净的属性，没有奇怪的分号
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-2.5-flash", 
+            systemInstruction: SYSTEM_INSTRUCTION,
+            generationConfig: {
                 responseMimeType: "application/json"
             }
         });
