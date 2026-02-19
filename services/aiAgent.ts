@@ -1,4 +1,3 @@
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import readXlsxFile from 'read-excel-file';
 import { ComponentType, OrderItem } from "../types";
@@ -39,36 +38,33 @@ Example Output Format:
 
 export const parseExcelWithGemini = async (file: File, apiKey: string): Promise<Partial<OrderItem>[]> => {
     try {
-        // 1. 读取 Excel 文件
+        // 1. Read Excel File
         const rows = await readXlsxFile(file);
         
-        // 转换为类似 CSV 的简单字符串，省 Token
+        // Convert to simple CSV-like string for token efficiency
         const csvContent = rows.map(row => row.join(" | ")).join("\n");
 
-        // 2. 初始化 Gemini (使用正确的实例名称)
-        // 建议优先使用传入的 apiKey，如果没有再用环境变量的
+        // 2. Initialize Gemini
         const key = apiKey || import.meta.env.VITE_GEMINI_API_KEY || "";
         const genAI = new GoogleGenerativeAI(key);
         
-        // 🚨 重点修复：在这里配置模型、系统指令和强制 JSON 输出
+        // 3. Configure Model with 2.5-flash
         const model = genAI.getGenerativeModel({ 
-            model: 'gemini-2.5-flash'，
+            model: "gemini-2.5-flash",
             systemInstruction: SYSTEM_INSTRUCTION,
             generationConfig: {
-                responseMimeType: "application/json" // 逼迫 AI 只输出纯 JSON，不加 Markdown
+                responseMimeType: "application/json"
             }
         });
 
-        // 3. 调用 API (官方标准写法)
+        // 4. Call API
         const prompt = `Here is the BOM data:\n${csvContent}`;
         const result = await model.generateContent(prompt);
 
-        // 4. 解析返回值 (官方提取 text 的标准写法)
+        // 5. Parse Response
         const responseText = result.response.text();
-        
         if (!responseText) throw new Error("Empty response from AI");
 
-        // 解析 JSON
         const parsed = JSON.parse(responseText);
         
         if (!parsed.items || !Array.isArray(parsed.items)) {
