@@ -8,6 +8,9 @@ interface SidebarProps {
   onBulkChange: (updates: Partial<OrderHeader>) => void;
   onSaveProject: () => void;
   onLoadProject: (file: File) => void;
+  onOpenAiWizard?: () => void;
+  onApiKeyChange?: (key: string) => void;
+  apiKey?: string;
 }
 
 interface SavedProfile {
@@ -16,7 +19,10 @@ interface SavedProfile {
     data: Partial<OrderHeader>;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ header, onChange, onBulkChange, onSaveProject, onLoadProject }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ 
+    header, onChange, onBulkChange, onSaveProject, onLoadProject,
+    onOpenAiWizard, onApiKeyChange, apiKey = ""
+}) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -126,13 +132,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ header, onChange, onBulkChange
                     onClick={onSaveProject}
                     className="flex-1 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 py-2 rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors"
                 >
-                    <span>💾</span> Save Project
+                    <span>💾</span> Save
                 </button>
                 <button 
                     onClick={() => fileInputRef.current?.click()}
                     className="flex-1 bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 py-2 rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors"
                 >
-                    <span>📂</span> Load Project
+                    <span>📂</span> Load
                 </button>
                 <input 
                     type="file" 
@@ -142,9 +148,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ header, onChange, onBulkChange
                     className="hidden" 
                 />
             </div>
+            
+            {/* AI Action */}
+            <button 
+                onClick={onOpenAiWizard}
+                className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 py-2 rounded text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+            >
+                <span className="text-lg">✨</span> Import Excel via AI
+            </button>
           </div>
 
           <div className="p-6 space-y-4">
+            {/* API Key Input (Hidden functionality for simplicity in UI, usually in settings modal but here for access) */}
+            <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Gemini API Key</label>
+                <input 
+                    type="password" 
+                    value={apiKey} 
+                    onChange={(e) => onApiKeyChange && onApiKeyChange(e.target.value)}
+                    placeholder="Enter Key..."
+                    className="w-full text-xs p-1 border border-slate-300 rounded focus:border-blue-500 outline-none font-mono"
+                />
+            </div>
+            
+            <div className="border-t border-cad-200 my-2"></div>
+
             <InputGroup label="Company" value={header.company} onChange={(v) => onChange('company', v)} />
             <InputGroup label="From" value={header.from} onChange={(v) => onChange('from', v)} />
             <InputGroup label="Project" value={header.project} onChange={(v) => onChange('project', v)} />
@@ -213,10 +241,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ header, onChange, onBulkChange
                               Save
                           </button>
                       </div>
-                      <p className="text-[10px] text-blue-600 mt-2 flex items-start gap-1">
-                          <span className="text-lg leading-none">ℹ️</span>
-                          <span>Saves: Company, From, Project, Prepared By, Person In Charge, Cust Ref, Address, AF Type, Pressure.</span>
-                      </p>
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
@@ -236,14 +260,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ header, onChange, onBulkChange
                                       <button 
                                           onClick={() => handleLoadProfile(profile)}
                                           className="text-xs bg-green-50 text-green-700 px-3 py-1.5 rounded hover:bg-green-100 font-bold border border-green-200 transition-colors"
-                                          title="Load into form"
                                       >
                                           Load
                                       </button>
                                       <button 
                                           onClick={() => handleDeleteProfile(profile.id)}
                                           className="text-xs bg-red-50 text-red-700 px-3 py-1.5 rounded hover:bg-red-100 font-bold border border-red-200 transition-colors"
-                                          title="Delete profile"
                                       >
                                           Delete
                                       </button>

@@ -1,12 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ItemBuilder } from './components/ItemBuilder';
 import { OrderSheet } from './components/OrderSheet';
+import { AiWizard } from './components/AiWizard';
 import { OrderHeader, OrderItem, SavedProject } from './types';
 import { downloadSheetDxf } from './utils/dxfWriter';
+import { generateDuctDrawing } from './services/geminiService';
 
-// --- Lock Screen Component ---
+// --- Lock Screen Component (Unchanged) ---
 const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
     const [passcode, setPasscode] = useState("");
     const [error, setError] = useState(false);
@@ -26,7 +28,6 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
             <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm border border-cad-200 animate-[fadeIn_0.3s_ease-out]">
                 <div className="flex flex-col items-center mb-6">
                     <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4 border border-blue-100 shadow-inner overflow-hidden relative">
-                        {/* Try to load logo, fallback to icon */}
                         <img 
                             src="/logo_acesian.png" 
                             alt="Logo" 
@@ -66,23 +67,14 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
                         className="w-full bg-cad-900 hover:bg-black text-white font-bold py-3 rounded-lg shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
                     >
                         <span>Unlock System</span>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                     </button>
                 </form>
-
-                <div className="mt-8 text-center border-t border-cad-100 pt-4">
-                    <p className="text-[10px] text-cad-400">
-                        Authorized Personnel Only<br/>
-                        Acesian Technologies Pte Ltd
-                    </p>
-                </div>
             </div>
         </div>
     );
 };
 
 export default function App() {
-  // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     try {
         return sessionStorage.getItem('acesian_auth') === 'true';
@@ -91,7 +83,6 @@ export default function App() {
     }
   });
 
-  // Order Header State
   const [header, setHeader] = useState<OrderHeader>({
     company: "--- Pte Ltd",
     from: "Mr -",
@@ -109,18 +100,21 @@ export default function App() {
     pressureRating: "2500 PA"
   });
 
-  // Items State
   const [items, setItems] = useState<OrderItem[]>([]);
-  
-  // Edit / Insert Mode State
   const [editingItem, setEditingItem] = useState<OrderItem | null>(null);
   const [insertIndex, setInsertIndex] = useState<number | null>(null);
-  
-  // Settings
   const [showSummary, setShowSummary] = useState(true);
   const [includeSummaryInPrint, setIncludeSummaryInPrint] = useState(true);
+  
+  // AI Feature State
+  const [showAiWizard, setShowAiWizard] = useState(false);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('acesian_api_key') || "");
 
-  // Helper: Re-calculate Item Numbers sequentially
+  const updateApiKey = (key: string) => {
+      setApiKey(key);
+      localStorage.setItem('acesian_api_key', key);
+  };
+
   const reindexItems = (list: OrderItem[]): OrderItem[] => {
       return list.map((item, index) => ({
           ...item,
@@ -141,29 +135,25 @@ export default function App() {
     setHeader(prev => ({ ...prev, ...updates }));
   };
 
-  // Central Save Handler (Add / Update / Insert)
   const handleSaveItem = (itemData: any) => {
     let newItems = [...items];
 
     if (editingItem) {
-        // Update Existing Item
         newItems = newItems.map(item => 
             item.id === editingItem.id 
-                ? { ...item, ...itemData, id: item.id } // Preserve ID
+                ? { ...item, ...itemData, id: item.id } 
                 : item
         );
         setEditingItem(null);
     } else if (insertIndex !== null) {
-        // Insert at specific index (Insert Before)
         const newItem: OrderItem = {
             id: Date.now().toString(),
-            itemNo: 0, // Will be fixed by reindex
+            itemNo: 0, 
             ...itemData
         };
         newItems.splice(insertIndex, 0, newItem);
         setInsertIndex(null);
     } else {
-        // Standard Add (Append to end)
         const newItem: OrderItem = {
             id: Date.now().toString(),
             itemNo: 0,
@@ -175,23 +165,33 @@ export default function App() {
     setItems(reindexItems(newItems));
   };
 
+  // Bulk import from AI
+  const handleAiImport = (importedItems: any[]) => {
+      // Process imported items to generate SVGs
+      const processedItems = importedItems.map((item, idx) => ({
+          ...item,
+          id: `ai-${Date.now()}-${idx}`,
+          itemNo: 0,
+          // Generate the SVG now based on extracted params
+          sketchSvg: generateDuctDrawing(item.componentType, item.params)
+      }));
+      
+      const newItems = [...items, ...processedItems];
+      setItems(reindexItems(newItems));
+  };
+
   const handleRemoveItem = (id: string) => {
     const newItems = items.filter(item => item.id !== id);
     setItems(reindexItems(newItems));
-    
-    // If we removed the item currently being edited, cancel edit mode
-    if (editingItem && editingItem.id === id) {
-        setEditingItem(null);
-    }
+    if (editingItem && editingItem.id === id) setEditingItem(null);
   };
 
   const handleDuplicateItem = (item: OrderItem) => {
     const newItem: OrderItem = {
       ...item,
       id: Date.now().toString(),
-      itemNo: 0, // Will be reindexed
+      itemNo: 0, 
     };
-    // Add to end by default
     const newItems = [...items, newItem];
     setItems(reindexItems(newItems));
   };
@@ -199,24 +199,18 @@ export default function App() {
   const handleMoveItem = (index: number, direction: 'up' | 'down') => {
       if (direction === 'up' && index === 0) return;
       if (direction === 'down' && index === items.length - 1) return;
-
       const newItems = [...items];
       const targetIndex = direction === 'up' ? index - 1 : index + 1;
-      
-      // Swap
       [newItems[index], newItems[targetIndex]] = [newItems[targetIndex], newItems[index]];
-      
       setItems(reindexItems(newItems));
   };
 
-  // Triggers Edit Mode
   const handleEditClick = (item: OrderItem) => {
       setEditingItem(item);
       setInsertIndex(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Triggers Insert Mode
   const handleInsertClick = (index: number) => {
       setInsertIndex(index);
       setEditingItem(null);
@@ -228,26 +222,15 @@ export default function App() {
       setInsertIndex(null);
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
   const handleDownloadDxf = () => {
-    if (items.length === 0) {
-      alert("No items to export.");
-      return;
-    }
+    if (items.length === 0) { alert("No items to export."); return; }
     downloadSheetDxf(items, header);
   };
 
-  // --- File Save/Load ---
   const handleSaveProject = () => {
-      const data: SavedProject = {
-          version: "1.0",
-          timestamp: Date.now(),
-          header: header,
-          items: items
-      };
+      const data: SavedProject = { version: "1.0", timestamp: Date.now(), header: header, items: items };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -262,9 +245,7 @@ export default function App() {
       const reader = new FileReader();
       reader.onload = (e) => {
           try {
-              const text = e.target?.result as string;
-              const data = JSON.parse(text) as SavedProject;
-              
+              const data = JSON.parse(e.target?.result as string) as SavedProject;
               if (data.header && Array.isArray(data.items)) {
                   if (window.confirm("Load project? This will replace your current workspace.")) {
                       setHeader(data.header);
@@ -272,37 +253,30 @@ export default function App() {
                       setEditingItem(null);
                       setInsertIndex(null);
                   }
-              } else {
-                  alert("Invalid project file structure.");
-              }
-          } catch (err) {
-              alert("Failed to parse project file.");
-              console.error(err);
-          }
+              } else { alert("Invalid project file structure."); }
+          } catch (err) { alert("Failed to parse project file."); }
       };
       reader.readAsText(file);
   };
 
-  if (!isAuthenticated) {
-      return <LockScreen onUnlock={handleUnlock} />;
-  }
+  if (!isAuthenticated) return <LockScreen onUnlock={handleUnlock} />;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-cad-50 font-sans text-cad-900 selection:bg-blue-100 print:h-auto print:w-auto print:overflow-visible print:block">
       
-      {/* Left: Global Settings */}
       <Sidebar 
           header={header} 
           onChange={handleHeaderChange}
           onBulkChange={handleBulkHeaderChange} 
           onSaveProject={handleSaveProject}
           onLoadProject={handleLoadProject}
+          onOpenAiWizard={() => setShowAiWizard(true)}
+          onApiKeyChange={updateApiKey}
+          apiKey={apiKey}
       />
       
-      {/* Main Content */}
       <main className="flex-1 flex flex-col h-full relative overflow-hidden print:h-auto print:overflow-visible print:block">
         
-        {/* Top: Item Builder */}
         <ItemBuilder 
             onSave={handleSaveItem} 
             editingItem={editingItem}
@@ -310,9 +284,7 @@ export default function App() {
             onCancel={handleCancelMode}
         />
 
-        {/* Bottom: Preview (Updated overflow-y-auto to allow scrolling) */}
         <div className="flex-1 relative overflow-y-auto bg-cad-200 print:h-auto print:overflow-visible print:bg-white print:block">
-           {/* Print Toolbar */}
            <div className="no-print absolute top-4 right-8 z-30 flex flex-col items-end gap-2">
               <div className="flex gap-2">
                   <button 
@@ -321,26 +293,22 @@ export default function App() {
                   >
                     Clear All
                   </button>
-                  
                   <button 
                      onClick={handleDownloadDxf}
                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow-lg text-sm font-bold flex items-center gap-2"
-                     title="Download all items as a single DXF file compatible with AutoCAD"
                   >
                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                     Export to AutoCAD (.dxf)
+                     Export DXF
                   </button>
-
                   <button 
                      onClick={handlePrint}
                      className="bg-cad-800 hover:bg-cad-900 text-white px-6 py-2 rounded shadow-lg text-sm font-bold flex items-center gap-2"
                   >
                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                     Print / Save PDF
+                     Print / PDF
                   </button>
               </div>
 
-              {/* Print Options */}
               <div className="bg-white/90 backdrop-blur p-2 rounded shadow border border-cad-200 text-xs flex gap-4">
                   <label className="flex items-center gap-1 cursor-pointer select-none text-cad-700 font-bold">
                       <input type="checkbox" checked={showSummary} onChange={(e) => setShowSummary(e.target.checked)} />
@@ -367,6 +335,15 @@ export default function App() {
                 printSummary={includeSummaryInPrint}
             />
         </div>
+
+        {/* AI Wizard Modal */}
+        {showAiWizard && (
+            <AiWizard 
+                apiKey={apiKey} 
+                onClose={() => setShowAiWizard(false)} 
+                onImport={handleAiImport} 
+            />
+        )}
       </main>
     </div>
   );
