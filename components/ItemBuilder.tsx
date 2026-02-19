@@ -4,11 +4,11 @@ import { ComponentType, DuctParams, OrderItem } from '../types';
 import { generateDuctDrawing } from '../services/geminiService';
 import { generateDescription } from '../services/descriptionService';
 import { getDefaultParams } from '../services/componentRules';
-import * as Inputs from './DuctInputs';
+import { COMPONENT_REGISTRY } from '../services/componentRegistry';
 import { NumInput, TextInput } from './InputFields';
 import { getFlangeParams } from '../services/flangeStandards';
 
-export { getDefaultParams }; // Re-export for compatibility if needed elsewhere
+export { getDefaultParams };
 
 interface ItemBuilderProps {
   onSave: (item: any) => void;
@@ -108,7 +108,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
     if (lastUsedParams.current[componentType]) {
         setParams(lastUsedParams.current[componentType]);
     } else {
-        // 2. Otherwise load default
+        // 2. Otherwise load default from registry
         setParams(getDefaultParams(componentType));
     }
 
@@ -160,7 +160,6 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
             newParams.length = (d <= 200) ? 150 : 224;
         }
     }
-    // Multiblade Length is now freely editable, no auto-reset
     if ((componentType === ComponentType.TEE || componentType === ComponentType.CROSS_TEE) && key === 'tap_d') {
         if (shouldAutoCalc('length')) {
             newParams.length = Number(val) + 200;
@@ -175,40 +174,26 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
          const gap = d3 * 1.4142;
 
          if (key === 'd2') {
-             // 1. Update B default if not dirty
              let currentB = b;
              if (shouldAutoCalc('b_len')) {
                  currentB = d3 >= 1000 ? 150 : 100;
                  newParams.b_len = currentB;
              }
-             // 2. Update Length based on new Gap + A + B
              if (shouldAutoCalc('length')) {
                  newParams.length = Math.round(gap + a + currentB);
              }
-             // 3. Update Branch Length default
              if (shouldAutoCalc('branch_len')) {
                  newParams.branch_len = Math.round(gap + 200);
              }
          }
          else if (key === 'a_len') {
-             // Change a -> Update Length (L = gap + a + b)
-             if (shouldAutoCalc('length')) {
-                 newParams.length = Math.round(gap + Number(val) + b);
-             }
+             if (shouldAutoCalc('length')) newParams.length = Math.round(gap + Number(val) + b);
          }
          else if (key === 'b_len') {
-             // Change b -> Update Length (L = gap + a + b)
-             if (shouldAutoCalc('length')) {
-                 newParams.length = Math.round(gap + a + Number(val));
-             }
+             if (shouldAutoCalc('length')) newParams.length = Math.round(gap + a + Number(val));
          }
          else if (key === 'length') {
-             // Change Length -> Update b (Standard practice: Outlet collar absorbs length change)
-             // L = gap + a + b  =>  b = L - gap - a
-             if (shouldAutoCalc('b_len')) {
-                 const newB = Math.max(0, Math.round(Number(val) - gap - a));
-                 newParams.b_len = newB;
-             }
+             if (shouldAutoCalc('b_len')) newParams.b_len = Math.max(0, Math.round(Number(val) - gap - a));
          }
     }
 
@@ -217,24 +202,15 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         const d2 = key === 'd2' ? Number(val) : Number(newParams.d2 || 300);
         const a = key === 'a_len' ? Number(val) : Number(newParams.a_len || 100);
         const b = key === 'b_len' ? Number(val) : Number(newParams.b_len || 100);
-        const SLOPE_W = 100; // Fixed
+        const SLOPE_W = 100;
 
-        // Auto-calc Length: L = a + slope + d2 + b
         if (key === 'd2' || key === 'a_len' || key === 'b_len') {
-            if (shouldAutoCalc('length')) {
-                 newParams.length = a + SLOPE_W + d2 + b;
-            }
+            if (shouldAutoCalc('length')) newParams.length = a + SLOPE_W + d2 + b;
         }
         else if (key === 'length') {
-            // If user changes L, adjust b
-            // b = L - a - slope - d2
-            if (shouldAutoCalc('b_len')) {
-                const newB = Math.max(0, Number(val) - a - SLOPE_W - d2);
-                newParams.b_len = newB;
-            }
+            if (shouldAutoCalc('b_len')) newParams.b_len = Math.max(0, Number(val) - a - SLOPE_W - d2);
         }
 
-        // Auto-calc Thickness based on D1
         if (key === 'd1') {
             const d = Number(val);
             let t = "0.9";
@@ -247,7 +223,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
         }
     }
 
-    // Flange Standard Auto-Calc for Blind Plate and Angle Flange
+    // Flange Standard Auto-Calc
     if ((componentType === ComponentType.BLIND_PLATE || componentType === ComponentType.ANGLE_FLANGE) && key === 'd1') {
         const d = Number(val);
         const std = getFlangeParams(d);
@@ -258,12 +234,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
     // Offset Logic
     if (componentType === ComponentType.OFFSET && key === 'd1') {
         const d = Number(val);
-        // Sync D2 if not modified by user
-        if (shouldAutoCalc('d2')) {
-            newParams.d2 = d;
-        }
-
-        // Thickness Logic
+        if (shouldAutoCalc('d2')) newParams.d2 = d;
         let thk = "0.9";
         if (d <= 500) thk = "0.9";
         else if (d <= 650) thk = "1.2";
@@ -275,7 +246,7 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
     setParams(newParams);
   };
 
-  // --- Tap/NPT Handlers ---
+  // --- Array Handlers ---
   const handleTapQtyChange = (newQty: number) => {
       if (newQty < 0) return;
       const currentTaps = params.taps || [];
@@ -308,40 +279,9 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
   };
 
   const handleSave = async () => {
-    // Generate Description using shared service
     const description = generateDescription(componentType, params);
-    
     onSave({ componentType, params, ...meta, description, sketchSvg: previewSvg });
     if (!editingItem) setMeta(prev => ({ ...prev, tagNo: "", qty: 1, notes: "" }));
-  };
-
-  const renderParamsInputs = () => {
-    const inputProps = {
-        params,
-        onChange: handleParamChange,
-        onFocus: (id: string) => setActiveField(id),
-        onBlur: () => setActiveField(null)
-    };
-
-    switch (componentType) {
-      case ComponentType.ELBOW: return <Inputs.ElbowInputs {...inputProps} />;
-      case ComponentType.REDUCER: return <Inputs.ReducerInputs {...inputProps} />;
-      case ComponentType.STRAIGHT: return <Inputs.StraightInputs {...inputProps} />;
-      case ComponentType.TEE: return <Inputs.TeeInputs {...inputProps} />;
-      case ComponentType.CROSS_TEE: return <Inputs.CrossTeeInputs {...inputProps} />;
-      case ComponentType.LATERAL_TEE: return <Inputs.LateralTeeInputs {...inputProps} />;
-      case ComponentType.BOOT_TEE: return <Inputs.BootTeeInputs {...inputProps} />;
-      case ComponentType.TRANSFORMATION: return <Inputs.TransformationInputs {...inputProps} />;
-      case ComponentType.VOLUME_DAMPER: return <Inputs.VolumeDamperInputs {...inputProps} />;
-      case ComponentType.MULTIBLADE_DAMPER: return <Inputs.MultibladeDamperInputs {...inputProps} />;
-      case ComponentType.STRAIGHT_WITH_TAPS: return <Inputs.StraightWithTapsInputs {...inputProps} onTapQtyChange={handleTapQtyChange} onNptQtyChange={handleNptQtyChange} onTapUpdate={handleTapUpdate} onNptUpdate={handleNptUpdate} />;
-      case ComponentType.BLIND_PLATE: return <Inputs.BlindPlateInputs {...inputProps} />;
-      case ComponentType.BLAST_GATE_DAMPER: return <Inputs.BlastGateDamperInputs {...inputProps} />;
-      case ComponentType.ANGLE_FLANGE: return <Inputs.AngleFlangeInputs {...inputProps} />;
-      case ComponentType.OFFSET: return <Inputs.OffsetInputs {...inputProps} />;
-      case ComponentType.SADDLE: return <Inputs.SaddleInputs {...inputProps} />;
-      case ComponentType.MANUAL: return <Inputs.ManualInputs {...inputProps} />;
-    }
   };
 
   const getModeLabel = () => {
@@ -350,10 +290,8 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
       return "ADD NEW ITEM";
   };
 
-  // SVG Click Handler for Bi-Directional Focusing
   const handleSvgClick = (e: React.MouseEvent<HTMLDivElement>) => {
       let target = e.target as HTMLElement;
-      // Traverse up to find data-param group if clicked on child (path/text/arrow)
       while (target && target !== e.currentTarget) {
           const param = target.getAttribute('data-param');
           if (param) {
@@ -368,9 +306,12 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
       }
   };
 
+  // --- Dynamic Input Rendering using Registry ---
+  const InputComponent = COMPONENT_REGISTRY[componentType]?.inputs;
+
   return (
     <div className={`no-print bg-white border-b border-cad-200 shadow-sm z-20 transition-all duration-300 flex flex-col ${editingItem ? 'border-l-4 border-l-orange-500' : insertIndex !== null ? 'border-l-4 border-l-green-500' : ''}`}>
-        {/* ... Header Bar (Unchanged) ... */}
+        {/* Header Bar */}
         <div className="flex items-center justify-between p-4 bg-gray-50 border-b border-cad-100">
             <div className="flex items-center gap-4">
                 <div className="relative">
@@ -431,7 +372,20 @@ export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, i
                 {/* Left: Inputs Panel */}
                 <div className="flex-1 p-6 space-y-6 lg:border-r border-cad-100">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {renderParamsInputs()}
+                        {InputComponent ? (
+                            <InputComponent 
+                                params={params} 
+                                onChange={handleParamChange}
+                                onFocus={(id: string) => setActiveField(id)}
+                                onBlur={() => setActiveField(null)}
+                                onTapQtyChange={handleTapQtyChange}
+                                onNptQtyChange={handleNptQtyChange}
+                                onTapUpdate={handleTapUpdate}
+                                onNptUpdate={handleNptUpdate}
+                            />
+                        ) : (
+                            <div className="col-span-full text-red-500">Component definition missing.</div>
+                        )}
                     </div>
                     
                     <div className="border-t border-cad-100 pt-4">

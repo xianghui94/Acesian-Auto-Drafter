@@ -1,5 +1,7 @@
+
 import { DuctParams } from "../../types";
 import { createSvg, drawDim, drawFlange, drawAnnotation } from "../svgUtils";
+import { calculateRadialBranchPath } from "../geometry/branchMath";
 
 export const generateTee = (params: DuctParams, activeField: string | null = null) => {
   const VIEW_WIDTH = 800;
@@ -54,17 +56,13 @@ export const generateTee = (params: DuctParams, activeField: string | null = nul
   // Remarks
   let remark1 = "";
   if (params.flangeRemark1) {
-      // Point to Bottom-Left corner of Main Body (moved from Top-Left)
-      // FLIP TO LEFT: isRight = false
-      // Move further down: leaderLength = 130, textBelow = false (keep text above line) to clear dim line
+      // Point to Bottom-Left corner of Main Body
       remark1 = drawAnnotation(xL_Left, yB_Left, params.flangeRemark1, false, false, 130, false).svg;
   }
   
   let remark2 = "";
   if (params.flangeRemark2) {
-      // Point to Bottom-Right corner of Main Body (moved from Top-Right)
-      // Keep Right: isRight = true (default)
-      // Move further down: leaderLength = 130, textBelow = false (keep text above line) to clear dim line
+      // Point to Bottom-Right corner of Main Body
       remark2 = drawAnnotation(xR_Left, yB_Left, params.flangeRemark2, false, true, 130, false).svg;
   }
   
@@ -87,53 +85,35 @@ export const generateTee = (params: DuctParams, activeField: string | null = nul
   `;
 
   // Dimensions Top View
-  const dimL = drawDim(xL_Left, yB_Left, xR_Left, yB_Left, `L=${L}`, 'bottom', 65, 'length', activeField); // Moved down slightly to avoid remark overlapping if any
+  const dimL = drawDim(xL_Left, yB_Left, xR_Left, yB_Left, `L=${L}`, 'bottom', 65, 'length', activeField); 
   const dimMd = drawDim(xL_Left - 15, yT_Left, xL_Left - 15, yB_Left, `Ø${Md}`, 'left', null, 'main_d', activeField);
   
   // --- SIDE VIEW (Right) ---
   // Rotated 90 deg anticlockwise from Branch Up
-  // Result: Main Circle, Branch Left
+  // Result: Main Circle, Branch Left (270 deg)
   
-  // Main Circle
+  // 1. Main Circle
   const circleRight = `<circle cx="${cxRight}" cy="${cy}" r="${V_MD/2}" class="line" />`;
   
-  // Branch Left (Rectangle extending left)
-  // Intersection with circle at x = cxRight - sqrt(R^2 - y^2)
-  const yBranchTop_R = cy - V_BD/2;
-  const yBranchBot_R = cy + V_BD/2;
+  // 2. Branch using Geometry Engine (270 deg = Left)
+  const geo = calculateRadialBranchPath(cxRight, cy, V_MD/2, V_BD/2, 270, V_NECK, false);
   
-  const dxIntersect = Math.sqrt(Math.max(0, (V_MD/2)*(V_MD/2) - (V_BD/2)*(V_BD/2)));
-  const xIntersect = cxRight - dxIntersect;
-  const xBranchTip = cxRight - (V_MD/2) - V_NECK;
-  
-  const branchRight = `
-    M${xIntersect},${yBranchTop_R} 
-    L${xBranchTip},${yBranchTop_R} 
-    L${xBranchTip},${yBranchBot_R} 
-    L${xIntersect},${yBranchBot_R}
-  `;
-  // Note: Not closed with Z to avoid line crossing circle interior
-  
-  // Flange Side View (Vertical at tip)
-  const f4 = drawFlange(xBranchTip, cy, V_BD, true);
-
-  // Weld Line Side View (Fillet)
-  const weldRight = `
-    <path d="M${xIntersect},${yBranchTop_R} Q${xIntersect-2},${yBranchTop_R-5} ${xIntersect+5},${yBranchTop_R-5}" stroke="black" fill="none" stroke-width="0.5" />
-    <path d="M${xIntersect},${yBranchBot_R} Q${xIntersect-2},${yBranchBot_R+5} ${xIntersect+5},${yBranchBot_R+5}" stroke="black" fill="none" stroke-width="0.5" />
-  `;
+  // 3. Render Geometry
+  // Draw branch body first, then flange on top
+  const branchRight = `<path d="${geo.path}" class="line" fill="white" />`;
+  // Flange at tip
+  const f4 = drawFlange(geo.endPoint.x, geo.endPoint.y, V_BD, true);
 
   // Dimensions Side View
-  const dimBd = drawDim(xBranchTip, yBranchTop_R, xBranchTip, yBranchBot_R, `Ø${Bd}`, 'left', null, 'tap_d', activeField);
+  const dimBd = drawDim(geo.endPoint.x, geo.endPoint.y - V_BD/2, geo.endPoint.x, geo.endPoint.y + V_BD/2, `Ø${Bd}`, 'left', null, 'tap_d', activeField);
   
   // Branch Length Dimension (Side View)
-  // From tip to the main duct edge (vertical tangent at center-line level)
   const xMainEdge = cxRight - V_MD/2;
-  const dimBranchLen = drawDim(xBranchTip, yBranchTop_R, xMainEdge, yBranchTop_R, `${neckLen}`, 'top', 30, 'branch_l', activeField);
+  const dimBranchLen = drawDim(geo.endPoint.x, geo.endPoint.y - V_BD/2, xMainEdge, geo.endPoint.y - V_BD/2, `${neckLen}`, 'top', 30, 'branch_l', activeField);
   
   // Center Lines Side View
   const clRight = `
-     <line x1="${xBranchTip-10}" y1="${cy}" x2="${cxRight+V_MD/2+10}" y2="${cy}" class="center-line" />
+     <line x1="${geo.endPoint.x-10}" y1="${cy}" x2="${cxRight+V_MD/2+10}" y2="${cy}" class="center-line" />
      <line x1="${cxRight}" y1="${cy-V_MD/2-10}" x2="${cxRight}" y2="${cy+V_MD/2+10}" class="center-line" />
   `;
 
@@ -145,7 +125,7 @@ export const generateTee = (params: DuctParams, activeField: string | null = nul
 
   return createSvg(
      `<path d="${outlineLeft}" class="line" />` + weldLeft + f1 + f2 + f3 + clLeft + dimL + dimMd + remark1 + remark2 + remark3 +
-     circleRight + `<path d="${branchRight}" class="line" />` + weldRight + f4 + clRight + dimBd + dimBranchLen +
+     circleRight + branchRight + f4 + clRight + dimBd + dimBranchLen +
      titles,
      VIEW_WIDTH, VIEW_HEIGHT
   );

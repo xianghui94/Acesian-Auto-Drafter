@@ -1,6 +1,7 @@
 
 import { DuctParams } from "../../types";
 import { createSvg, drawDim, drawFlange, drawAnnotation, VIEW_BOX_SIZE, CFG } from "../svgUtils";
+import { calculateRadialBranchPath } from "../geometry/branchMath";
 
 // --- Types & Constants ---
 type Orientation = 'TOP' | 'BOT' | 'LEFT' | 'RIGHT' | 'TOP_RIGHT' | 'BOT_RIGHT' | 'BOT_LEFT' | 'TOP_LEFT';
@@ -14,6 +15,7 @@ interface FeaturePoint {
     diameter: number; // Scaled diameter
     stickOut: number; // Scaled stickout length
     paramIndex: number; // For highlighting linkage
+    angleDeg: number; // Original angle
 }
 
 const VIEW_WIDTH = 800;
@@ -163,96 +165,40 @@ const drawFeatureTopView = (
     return { svg, topExclusion, botExclusion };
 };
 
-// --- Helper: Draw Side View Feature ---
+// --- Helper: Draw Side View Feature using Geometry Engine ---
 const drawFeatureSideView = (cx: number, cy: number, f: FeaturePoint, pipeRad: number, activeField: string | null) => {
-    let svg = "";
     
     // Check if this feature's angle input is highlighted
     const isActive = activeField === (f.type === 'tap' ? `taps-angle-${f.paramIndex}` : `npt-angle-${f.paramIndex}`);
     const activeClass = isActive ? "highlight" : "";
     const activeTextClass = isActive ? "dim-text highlight" : "dim-text";
 
-    let angleDeg = 0;
-    switch (f.orientation) {
-        case 'TOP': angleDeg = 0; break; 
-        case 'TOP_RIGHT': angleDeg = 45; break;
-        case 'RIGHT': angleDeg = 90; break;
-        case 'BOT_RIGHT': angleDeg = 135; break;
-        case 'BOT': angleDeg = 180; break;
-        case 'BOT_LEFT': angleDeg = 225; break;
-        case 'LEFT': angleDeg = 270; break;
-        case 'TOP_LEFT': angleDeg = 315; break;
-    }
+    // Use the specialized geometry engine for accurate saddle profile
+    const geo = calculateRadialBranchPath(
+        cx, 
+        cy, 
+        pipeRad, 
+        f.diameter / 2, 
+        f.angleDeg, 
+        f.stickOut,
+        f.type === 'tap'
+    );
+
+    let svg = "";
     
-    const rad = (angleDeg - 90) * Math.PI / 180;
-    
-    // Calculate Tap Geometry
-    const hw = f.diameter / 2;
-    // Calculate radial distance to intersection point on circle surface (chord logic)
-    // rIntersect^2 + hw^2 = pipeRad^2  => rIntersect = sqrt(pipeRad^2 - hw^2)
-    // Clamp hw to avoid sqrt of negative if tap >= pipe (geometric limit)
-    const safeHw = Math.min(hw, pipeRad - 0.5);
-    const rIntersect = Math.sqrt(pipeRad * pipeRad - safeHw * safeHw);
-    
-    const rStart = rIntersect; // Base of tap sits on intersection line
-    const rEnd = pipeRad + f.stickOut; // Outer edge relative to theoretical center surface
+    // Draw the Branch Body with Saddle intersection
+    svg += `<path d="${geo.path}" class="line ${activeClass}" fill="white" />`;
 
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-
-    const pCos = Math.cos(rad + Math.PI/2);
-    const pSin = Math.sin(rad + Math.PI/2);
-
-    // Points: 
-    // p1 (Base Left), p2 (Top Left), p3 (Top Right), p4 (Base Right)
-    const p1 = { x: cx + rStart*cos + safeHw*pCos, y: cy + rStart*sin + safeHw*pSin };
-    const p2 = { x: cx + rEnd*cos + safeHw*pCos,   y: cy + rEnd*sin + safeHw*pSin };
-    const p3 = { x: cx + rEnd*cos - safeHw*pCos,   y: cy + rEnd*sin - safeHw*pSin };
-    const p4 = { x: cx + rStart*cos - safeHw*pCos, y: cy + rStart*sin - safeHw*pSin };
-
-    // Path construction:
-    // M p1 L p2 L p3 L p4 (Trapezoid/Rectangle)
-    // Then Arc back to p1 to conform to cylinder surface
-    // The arc is A rx ry rot large_arc sweep end_x end_y
-    // Radius is pipeRad.
-    // Direction: p4 -> p1.
-    // If angleDeg=0 (Top): p4 is Right, p1 is Left. Arc goes p4->p1 counter-clockwise around center?
-    // Let's check logic:
-    // angle=0 -> rad=-90. cos=0, sin=-1. pCos=1, pSin=0.
-    // p1 = (cx + hw, cy - rStart). Right side of top.
-    // p4 = (cx - hw, cy - rStart). Left side of top.
-    // Wait, p1 uses +pCos. If pCos=1, p1.x > cx. So p1 is Right.
-    // p4 uses -pCos. p4.x < cx. So p4 is Left.
-    // Path: p1 (Right) -> p2 (Right Top) -> p3 (Left Top) -> p4 (Left Base).
-    // Close: p4 -> p1.
-    // This goes Left -> Right.
-    // The main circle goes Clockwise visually? Standard SVG circle is drawn 0->360.
-    // On Top (y < cy), the circle arc goes Left -> Right.
-    // So p4 -> p1 follows the circle arc direction if we use sweep=1?
-    // Let's try sweep 1.
-    
-    svg += `<path d="M${p1.x},${p1.y} L${p2.x},${p2.y} L${p3.x},${p3.y} L${p4.x},${p4.y} A${pipeRad},${pipeRad} 0 0,1 ${p1.x},${p1.y} Z" class="line ${activeClass}" fill="white" />`;
-
-    if (f.type === 'tap') {
-        const fh = 5;
-        const fw = f.diameter + 8;
-        const hfw = fw/2;
-        const fFaceC = { x: cx + rEnd*cos, y: cy + rEnd*sin };
-        const fBackC = { x: cx + (rEnd-fh)*cos, y: cy + (rEnd-fh)*sin };
-        const f1 = { x: fFaceC.x + hfw*pCos, y: fFaceC.y + hfw*pSin };
-        const f2 = { x: fBackC.x + hfw*pCos, y: fBackC.y + hfw*pSin };
-        const f3 = { x: fBackC.x - hfw*pCos, y: fBackC.y - hfw*pSin };
-        const f4 = { x: fFaceC.x - hfw*pCos, y: fFaceC.y - hfw*pSin };
-        
-        svg += `<path d="M${f1.x},${f1.y} L${f2.x},${f2.y} L${f3.x},${f3.y} L${f4.x},${f4.y} Z" class="flange ${activeClass}" fill="white" stroke-width="2" />`;
+    // Draw Flange if exists
+    if (geo.flangePath) {
+        svg += `<path d="${geo.flangePath}" class="flange ${activeClass}" fill="white" stroke-width="2" />`;
     }
 
-    const labelR = rEnd + 40;
-    const lx = cx + labelR * cos;
-    const ly = cy + labelR * sin;
+    // Draw Labels
+    svg += `<text x="${geo.labelPoint.x}" y="${geo.labelPoint.y}" class="${activeTextClass}" font-size="${GEN_TEXT_SIZE}" dominant-baseline="middle" text-anchor="middle">${f.angleDeg}°</text>`;
     
-    svg += `<text x="${lx}" y="${ly}" class="${activeTextClass}" font-size="${GEN_TEXT_SIZE}" dominant-baseline="middle" text-anchor="middle">${angleDeg}°</text>`;
-    svg += `<line x1="${cx}" y1="${cy}" x2="${p2.x}" y2="${p2.y}" stroke="#999" stroke-dasharray="2,2" stroke-width="0.5" />`;
+    // Dashed guide from center
+    svg += `<line x1="${cx}" y1="${cy}" x2="${geo.endPoint.x}" y2="${geo.endPoint.y}" stroke="#999" stroke-dasharray="2,2" stroke-width="0.5" />`;
 
     return svg;
 };
@@ -353,7 +299,8 @@ export const generateStraightWithTaps = (params: DuctParams, activeField: string
             type: 'tap',
             diameter: (t.diameter / d1) * V_D,
             stickOut: 30,
-            paramIndex: idx
+            paramIndex: idx,
+            angleDeg: t.angle || 0
         });
     });
 
@@ -366,7 +313,8 @@ export const generateStraightWithTaps = (params: DuctParams, activeField: string
             type: 'npt',
             diameter: 25, 
             stickOut: 15,
-            paramIndex: idx
+            paramIndex: idx,
+            angleDeg: n.angle || 0
         });
     });
 
@@ -388,6 +336,7 @@ export const generateStraightWithTaps = (params: DuctParams, activeField: string
         if (res.botExclusion > maxStickBot) maxStickBot = res.botExclusion;
     });
 
+    // Use the Geometry Engine for Side View
     features.forEach(f => {
         svgContent += drawFeatureSideView(cxRight, CY, f, V_D/2, activeField);
     });
