@@ -52,7 +52,7 @@ export const parseExcelWithGemini = async (file: File, apiKey: string): Promise<
         
         // 🚨 重点修复：在这里配置模型、系统指令和强制 JSON 输出
         const model = genAI.getGenerativeModel({ 
-            model: 'gemini-1.5-flash',
+            model: 'gemini-2.5-flash'，
             systemInstruction: SYSTEM_INSTRUCTION,
             generationConfig: {
                 responseMimeType: "application/json" // 逼迫 AI 只输出纯 JSON，不加 Markdown
