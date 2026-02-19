@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import readXlsxFile from 'read-excel-file';
 import { ComponentType, OrderItem } from "../types";
 
@@ -39,31 +39,36 @@ Example Output Format:
 
 export const parseExcelWithGemini = async (file: File, apiKey: string): Promise<Partial<OrderItem>[]> => {
     try {
-        // 1. Read Excel File
+        // 1. 读取 Excel 文件
         const rows = await readXlsxFile(file);
         
-        // Convert to simple CSV-like string for token efficiency
+        // 转换为类似 CSV 的简单字符串，省 Token
         const csvContent = rows.map(row => row.join(" | ")).join("\n");
 
-        // 2. Initialize Gemini
-        const ai = new GoogleGenAI({ apiKey });
+        // 2. 初始化 Gemini (使用正确的实例名称)
+        // 建议优先使用传入的 apiKey，如果没有再用环境变量的
+        const key = apiKey || import.meta.env.VITE_GEMINI_API_KEY || "";
+        const genAI = new GoogleGenerativeAI(key);
         
-        // 3. Call API
-        const response = await ai.models.generateContent({
+        // 🚨 重点修复：在这里配置模型、系统指令和强制 JSON 输出
+        const model = genAI.getGenerativeModel({ 
             model: 'gemini-1.5-flash',
-            contents: [
-                { role: 'user', parts: [{ text: `Here is the BOM data:\n${csvContent}` }] }
-            ],
-            config: {
-                systemInstruction: SYSTEM_INSTRUCTION,
-                responseMimeType: "application/json"
+            systemInstruction: SYSTEM_INSTRUCTION,
+            generationConfig: {
+                responseMimeType: "application/json" // 逼迫 AI 只输出纯 JSON，不加 Markdown
             }
         });
 
-        // 4. Parse Response
-        const responseText = response.text();
+        // 3. 调用 API (官方标准写法)
+        const prompt = `Here is the BOM data:\n${csvContent}`;
+        const result = await model.generateContent(prompt);
+
+        // 4. 解析返回值 (官方提取 text 的标准写法)
+        const responseText = result.response.text();
+        
         if (!responseText) throw new Error("Empty response from AI");
 
+        // 解析 JSON
         const parsed = JSON.parse(responseText);
         
         if (!parsed.items || !Array.isArray(parsed.items)) {
