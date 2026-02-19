@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { parseExcelWithGemini } from '../services/aiAgent';
 import { generateDuctDrawing } from '../services/geminiService';
 import { generateDescription } from '../services/descriptionService';
+import { hydrateItemParams, getDefaultParams } from '../services/componentRules';
 import { OrderItem, ComponentType, DuctParams } from '../types';
-import { getDefaultParams } from './ItemBuilder';
 
 interface AiWizardProps {
     onClose: () => void;
@@ -179,10 +179,10 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
             
             const processedItems: EditableItem[] = rawItems.map((item, idx) => {
                 const type = item.componentType || ComponentType.ELBOW;
-                const safeParams = { 
-                    ...getDefaultParams(type), 
-                    ...(item.params || {}) 
-                };
+                
+                // CRITICAL: Hydrate with auto-calculation rules
+                // This converts AI partial data (d1=1000) into valid geometric data (r=1000)
+                const safeParams = hydrateItemParams(type, item.params || {});
                 
                 const editableItem: EditableItem = {
                     ...item,
@@ -213,6 +213,10 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
             const item = { ...newItems[selectedIndex] };
 
             if (field === 'params' && paramKey) {
+                // When user manually edits, we just update that field
+                // We typically DO NOT auto-calc here to avoid fighting the user,
+                // or we could use hydrateItemParams if we wanted aggressive auto-calc.
+                // For now, let's trust the user's manual edit.
                 const newParams = { ...item.params, [paramKey]: val };
                 item.params = newParams;
                 // Auto update description
@@ -221,7 +225,7 @@ export const AiWizard: React.FC<AiWizardProps> = ({ onClose, onImport }) => {
                 }
             } else {
                 (item as any)[field] = val;
-                // If type changes, reset params
+                // If type changes, reset params using hydrator
                 if (field === 'componentType') {
                     const newType = val as ComponentType;
                     item.params = getDefaultParams(newType);

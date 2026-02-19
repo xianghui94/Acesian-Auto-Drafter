@@ -64,8 +64,11 @@ export const parseExcelWithGemini = async (file: File, apiKey: string): Promise<
         const result = await model.generateContent(prompt);
 
         // 5. Parse Response
-        const responseText = result.response.text();
+        let responseText = result.response.text();
         if (!responseText) throw new Error("Empty response from AI");
+
+        // CLEANING STEP: Remove markdown code blocks if present
+        responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
 
         const parsed = JSON.parse(responseText);
         

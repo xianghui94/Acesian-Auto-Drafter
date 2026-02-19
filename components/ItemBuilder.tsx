@@ -3,9 +3,12 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ComponentType, DuctParams, OrderItem } from '../types';
 import { generateDuctDrawing } from '../services/geminiService';
 import { generateDescription } from '../services/descriptionService';
+import { getDefaultParams } from '../services/componentRules';
 import * as Inputs from './DuctInputs';
 import { NumInput, TextInput } from './InputFields';
 import { getFlangeParams } from '../services/flangeStandards';
+
+export { getDefaultParams }; // Re-export for compatibility if needed elsewhere
 
 interface ItemBuilderProps {
   onSave: (item: any) => void;
@@ -13,44 +16,6 @@ interface ItemBuilderProps {
   insertIndex: number | null;
   onCancel: () => void;
 }
-
-// Default Params Helper for Initialization and Thumbnails
-export const getDefaultParams = (type: ComponentType): DuctParams => {
-    switch (type) {
-      case ComponentType.ELBOW: return { d1: 500, angle: 90, radius: 250, extension1: 0, extension2: 0 };
-      case ComponentType.REDUCER: return { d1: 500, d2: 300, length: 300, extension1: 50, extension2: 50, reducerType: "Concentric" };
-      case ComponentType.STRAIGHT: return { d1: 300, length: 1200 };
-      case ComponentType.TEE: return { main_d: 500, tap_d: 300, length: 500, branch_l: 100 };
-      case ComponentType.CROSS_TEE: return { main_d: 500, tap_d: 300, length: 500, branch_l: 100 };
-      // Lateral Tee: Default derived from (300*1.414) + 100 + 100 = ~624
-      // Branch L default: (300 * 1.414) + 200 = ~624
-      case ComponentType.LATERAL_TEE: {
-          const d2 = 300;
-          const gap = d2 * 1.4142;
-          return { d1: 500, d2: d2, length: Math.round(gap + 200), a_len: 100, b_len: 100, branch_len: Math.round(gap + 200) }; 
-      }
-      // Boot Tee: L = a + 100 + d2 + b. Default a=100, b=100, d2=300 => L=600. 
-      // Collar Height (Total) = 100 (Transition) + 75 (Straight) = 175.
-      case ComponentType.BOOT_TEE: return { d1: 500, d2: 300, length: 600, a_len: 100, b_len: 100, branch_len: 175 };
-      case ComponentType.TRANSFORMATION: return { d1: 500, width: 500, height: 500, length: 300, offset: 0 };
-      case ComponentType.VOLUME_DAMPER: return { d1: 200, length: 150, actuation: "Handle" };
-      case ComponentType.MULTIBLADE_DAMPER: return { d1: 700, length: 400, bladeType: "Parallel" };
-      case ComponentType.STRAIGHT_WITH_TAPS: return { d1: 500, length: 1200, tapQty: 1, nptQty: 0, seamAngle: 0, taps: [{ dist: 600, diameter: 150, angle: 0 }], nptPorts: [] };
-      case ComponentType.BLIND_PLATE: {
-          const f = getFlangeParams(200);
-          return { d1: 200, pcd: f.bcd, holeCount: f.holeCount };
-      }
-      case ComponentType.BLAST_GATE_DAMPER: return { d1: 200, length: 200 };
-      case ComponentType.ANGLE_FLANGE: {
-          const f = getFlangeParams(800);
-          return { d1: 800, pcd: f.bcd, holeCount: f.holeCount };
-      }
-      case ComponentType.OFFSET: return { d1: 500, d2: 500, length: 800, offset: 200 };
-      case ComponentType.SADDLE: return { d1: 1000, d2: 450, length: 100 };
-      case ComponentType.MANUAL: return { userDescription: "" };
-      default: return {};
-    }
-};
 
 export const ItemBuilder: React.FC<ItemBuilderProps> = ({ onSave, editingItem, insertIndex, onCancel }) => {
   const [componentType, setComponentType] = useState<ComponentType>(ComponentType.ELBOW);
