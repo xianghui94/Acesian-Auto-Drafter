@@ -1,28 +1,45 @@
+
 import { DuctParams } from "../../types";
 import { createSvg, drawDim, drawFlange, drawRotatedFlange, drawArrow, drawAnnotation, V_CONSTANTS, VIEW_BOX_SIZE } from "../svgUtils";
 
 export const generateElbow = (params: DuctParams, activeField: string | null = null) => {
   const VIEW_WIDTH = VIEW_BOX_SIZE;
-  const VIEW_HEIGHT = 500; // Reduced from 800/600
+  const VIEW_HEIGHT = 500;
   
   const angle = params.angle || 90;
   const D_real = params.d1 || 500;
   const extReal1 = params.extension1 || 0;
   const extReal2 = params.extension2 || 0;
   
+  // Logic from AI agent: Radius defaults to 0.5D or 1.0D if not specified
   const valInnerR = params.radius !== undefined ? params.radius : ((D_real < 200) ? D_real * 1.0 : D_real * 0.5);
-  const rRatio = valInnerR / D_real;
 
-  const V_D = V_CONSTANTS.DIAM;
+  // SCHEMATIC CLAMPING
+  // 1. Clamp Diameter
+  const V_D = Math.min(D_real, V_CONSTANTS.MAX_DIAM);
+  
+  // 2. Scale Radius relative to Clamped D
+  const rRatio = valInnerR / D_real;
   const V_R_Inner = V_D * rRatio;
   const V_R_Outer = V_R_Inner + V_D;
   const V_R_Center = V_R_Inner + V_D/2;
-  const V_EXT1 = (extReal1 / D_real) * V_D;
-  const V_EXT2 = (extReal2 / D_real) * V_D;
+
+  // 3. Scale Extensions (Clamp max visual length for extensions)
+  const MAX_V_EXT = 100;
+  // If ext is large (e.g. 500), we clamp it to 100px.
+  // If ext is small (e.g. 50), we show it somewhat proportionally or min 20.
+  const calcVExt = (realExt: number) => {
+      if (realExt <= 0) return 0;
+      if (realExt > D_real) return MAX_V_EXT; // Very long extension
+      return (realExt / D_real) * V_D;
+  };
+
+  const V_EXT1 = calcVExt(extReal1);
+  const V_EXT2 = calcVExt(extReal2);
 
   const T = 0; 
   const xStart = 250; 
-  const y0 = 100; // Adjusted for 500px height
+  const y0 = 100; 
   
   const xCurveStart = xStart + V_EXT1; 
   const cx = xCurveStart + T; 
@@ -32,20 +49,11 @@ export const generateElbow = (params: DuctParams, activeField: string | null = n
   const sweepRad = (angle * Math.PI) / 180;
   const endRad = startRad + sweepRad;
 
+  // Segment logic for smooth arc
   let numSegments = 2; 
-  if (angle === 90) {
-      numSegments = (D_real <= 150) ? 4 : 5;
-  } else if (angle === 60) {
-      numSegments = (D_real <= 150) ? 2 : 4;
-  } else if (angle === 45) {
-      numSegments = (D_real <= 150) ? 2 : 3;
-  } else if (angle === 30) {
-      numSegments = (D_real <= 950) ? 2 : 3;
-  } else {
-      if (angle > 60) numSegments = 4;
-      else if (angle > 30) numSegments = 3;
-      else numSegments = 2;
-  }
+  if (angle === 90) numSegments = 5;
+  else if (angle >= 60) numSegments = 4;
+  else if (angle >= 30) numSegments = 3;
 
   const ptsOuter = [];
   const ptsInner = [];
@@ -117,12 +125,12 @@ export const generateElbow = (params: DuctParams, activeField: string | null = n
   const dimD = drawDim(xStart, y0, xStart, y0 + V_D, `D=${D_real}`, 'left', null, 'd1', activeField);
   
   let dimExt1 = "";
-  if (V_EXT1 > 0) {
+  if (V_EXT1 > 10 || extReal1 > 0) {
       dimExt1 = drawDim(xStart, y0, xCurveStart, y0, `${extReal1}`, 'top', 30, 'extension1', activeField);
   }
 
   let dimExt2 = "";
-  if (V_EXT2 > 0) {
+  if (V_EXT2 > 10 || extReal2 > 0) {
       const off = 30;
       const px = Math.cos(tanAngle - Math.PI/2);
       const py = Math.sin(tanAngle - Math.PI/2);

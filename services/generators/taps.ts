@@ -1,9 +1,8 @@
 
 import { DuctParams } from "../../types";
-import { createSvg, drawDim, drawFlange, drawAnnotation, VIEW_BOX_SIZE, CFG } from "../svgUtils";
+import { createSvg, drawDim, drawFlange, drawAnnotation, VIEW_BOX_SIZE, CFG, V_CONSTANTS } from "../svgUtils";
 import { calculateRadialBranchPath } from "../geometry/branchMath";
 
-// --- Types & Constants ---
 type Orientation = 'TOP' | 'BOT' | 'LEFT' | 'RIGHT' | 'TOP_RIGHT' | 'BOT_RIGHT' | 'BOT_LEFT' | 'TOP_LEFT';
 
 interface FeaturePoint {
@@ -12,19 +11,17 @@ interface FeaturePoint {
     hasRemark: boolean;
     orientation: Orientation;
     type: 'tap' | 'npt';
-    diameter: number; // Scaled diameter
-    stickOut: number; // Scaled stickout length
-    paramIndex: number; // For highlighting linkage
-    angleDeg: number; // Original angle
+    diameter: number; 
+    stickOut: number; 
+    paramIndex: number; 
+    angleDeg: number; 
 }
 
 const VIEW_WIDTH = 800;
-const VIEW_HEIGHT = 450; 
-const CY = 225; 
-const SCALE_FACTOR = 1.1; 
+const VIEW_HEIGHT = 650; // Increased from 450 to show dim stacks
+const CY = 325; // Shifted down
 const GEN_TEXT_SIZE = 24; 
 
-// --- Helper: Orientation Logic ---
 const getOrientation = (angle: number): Orientation => {
     const norm = (angle % 360 + 360) % 360;
     if (norm >= 337.5 || norm < 22.5) return 'TOP';
@@ -37,7 +34,6 @@ const getOrientation = (angle: number): Orientation => {
     return 'TOP_LEFT';
 };
 
-// --- Helper: Draw Main Pipe Body ---
 const drawPipeBody = (xL: number, yT: number, width: number, height: number, cxRight: number, d1: number, length: number, activeField: string | null) => {
     const xR = xL + width;
     const yB = yT + height;
@@ -62,7 +58,6 @@ const drawPipeBody = (xL: number, yT: number, width: number, height: number, cxR
     return svg;
 };
 
-// --- Helper: Draw Top View Feature ---
 const drawFeatureTopView = (
     tx: number, 
     yT: number, 
@@ -81,7 +76,6 @@ const drawFeatureTopView = (
     let topExclusion = 0; 
     let botExclusion = 0;
 
-    // Check if this feature is highlighted
     const isActive = activeField === (f.type === 'tap' ? `taps-diameter-${f.paramIndex}` : `npt-size-${f.paramIndex}`);
     const activeClass = isActive ? "highlight" : "";
 
@@ -165,15 +159,11 @@ const drawFeatureTopView = (
     return { svg, topExclusion, botExclusion };
 };
 
-// --- Helper: Draw Side View Feature using Geometry Engine ---
 const drawFeatureSideView = (cx: number, cy: number, f: FeaturePoint, pipeRad: number, activeField: string | null) => {
-    
-    // Check if this feature's angle input is highlighted
     const isActive = activeField === (f.type === 'tap' ? `taps-angle-${f.paramIndex}` : `npt-angle-${f.paramIndex}`);
     const activeClass = isActive ? "highlight" : "";
     const activeTextClass = isActive ? "dim-text highlight" : "dim-text";
 
-    // Use the specialized geometry engine for accurate saddle profile
     const geo = calculateRadialBranchPath(
         cx, 
         cy, 
@@ -185,25 +175,16 @@ const drawFeatureSideView = (cx: number, cy: number, f: FeaturePoint, pipeRad: n
     );
 
     let svg = "";
-    
-    // Draw the Branch Body with Saddle intersection
     svg += `<path d="${geo.path}" class="line ${activeClass}" fill="white" />`;
-
-    // Draw Flange if exists
     if (geo.flangePath) {
         svg += `<path d="${geo.flangePath}" class="flange ${activeClass}" fill="white" stroke-width="2" />`;
     }
-
-    // Draw Labels
     svg += `<text x="${geo.labelPoint.x}" y="${geo.labelPoint.y}" class="${activeTextClass}" font-size="${GEN_TEXT_SIZE}" dominant-baseline="middle" text-anchor="middle">${f.angleDeg}°</text>`;
-    
-    // Dashed guide from center
     svg += `<line x1="${cx}" y1="${cy}" x2="${geo.endPoint.x}" y2="${geo.endPoint.y}" stroke="#999" stroke-dasharray="2,2" stroke-width="0.5" />`;
 
     return svg;
 };
 
-// --- Helper: Dimension Stacking ---
 const drawDimensionStack = (
     features: FeaturePoint[], 
     xStart: number, 
@@ -248,8 +229,6 @@ const drawDimensionStack = (
             const currentOffset = baseOffset + clearance + (tier * LEVEL_HEIGHT);
             
             stackSvg += `<line x1="${tx}" y1="${yPipeCenter}" x2="${tx}" y2="${yRef}" class="phantom-line" stroke-width="0.5" opacity="0.5" />`;
-            
-            // Link to dist ID
             const id = item.type === 'tap' ? `taps-dist-${item.paramIndex}` : `npt-dist-${item.paramIndex}`;
             stackSvg += drawDim(xStart, yRef, tx, yRef, item.dist.toString(), side, currentOffset, id, activeField);
         });
@@ -272,13 +251,13 @@ const drawDimensionStack = (
     return svg;
 };
 
-// --- Main Generator ---
 export const generateStraightWithTaps = (params: DuctParams, activeField: string | null = null) => {
-    const d1 = params.d1 || 500;
-    const len = params.length || 1000;
+    const realD1 = params.d1 || 500;
+    const realL = params.length || 1000;
     
-    const V_D = 100 * SCALE_FACTOR; 
-    const V_L = 340 * SCALE_FACTOR; 
+    // SCHEMATIC CLAMPING
+    const V_D = Math.min(realD1, V_CONSTANTS.MAX_DIAM);
+    const V_L = Math.min(realL, V_CONSTANTS.MAX_LEN);
     
     const cxLeft = 320; 
     const cxRight = 720; 
@@ -291,13 +270,16 @@ export const generateStraightWithTaps = (params: DuctParams, activeField: string
     const features: FeaturePoint[] = [];
     
     (params.taps || []).forEach((t: any, idx: number) => {
+        let vTapDiam = (t.diameter / realD1) * V_D;
+        vTapDiam = Math.min(vTapDiam, V_CONSTANTS.MAX_DIAM * 0.9);
+
         features.push({
             dist: t.dist,
             label: t.remark || `Ø${t.diameter}`,
             hasRemark: !!t.remark,
             orientation: getOrientation(t.angle || 0),
             type: 'tap',
-            diameter: (t.diameter / d1) * V_D,
+            diameter: vTapDiam,
             stickOut: 30,
             paramIndex: idx,
             angleDeg: t.angle || 0
@@ -320,13 +302,13 @@ export const generateStraightWithTaps = (params: DuctParams, activeField: string
 
     let svgContent = "";
     
-    svgContent += drawPipeBody(xL, yT, V_L, V_D, cxRight, d1, len, activeField);
+    svgContent += drawPipeBody(xL, yT, V_L, V_D, cxRight, realD1, realL, activeField);
 
     let maxStickTop = 0;
     let maxStickBot = 0;
 
     features.forEach(f => {
-        const ratio = Math.max(0, Math.min(1, f.dist / len));
+        const ratio = Math.max(0, Math.min(1, f.dist / realL));
         const tx = xL + (ratio * V_L);
         
         const res = drawFeatureTopView(tx, yT, yB, f, V_D, activeField);
@@ -336,7 +318,6 @@ export const generateStraightWithTaps = (params: DuctParams, activeField: string
         if (res.botExclusion > maxStickBot) maxStickBot = res.botExclusion;
     });
 
-    // Use the Geometry Engine for Side View
     features.forEach(f => {
         svgContent += drawFeatureSideView(cxRight, CY, f, V_D/2, activeField);
     });
@@ -359,7 +340,7 @@ export const generateStraightWithTaps = (params: DuctParams, activeField: string
         features, 
         xL, 
         V_L, 
-        len, 
+        realL, 
         yT, 
         yB, 
         maxStickTop, 

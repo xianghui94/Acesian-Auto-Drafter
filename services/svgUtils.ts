@@ -1,5 +1,4 @@
 
-
 /**
  * Shared Utilities for SVG Generation
  */
@@ -7,16 +6,20 @@
 export const VIEW_BOX_SIZE = 800; 
 
 // Fixed visual constants (abstract units)
+// These define the "Schematic" limits to prevent viewbox overflow.
 export const V_CONSTANTS = {
-  LEN: 330,
-  DIAM: 150,
-  DIAM_LG: 190,
-  DIAM_SM: 115,
-  TAN: 60,
-  BRANCH_H: 95,
-  BRANCH_W: 115,
-  REDUCER_STRAIGHT: 60,
-  TRANS_LEN: 300,
+  // Maximum visual dimensions (pixels) regardless of real input
+  MAX_LEN: 360, 
+  MAX_DIAM: 200,
+  
+  // Specific sizing for schematic look
+  TAP_STICKOUT: 40,
+  BRANCH_MIN_LEN: 50,
+  BRANCH_MAX_LEN: 100,
+  
+  // Transformation specific
+  TRANS_MIN_LEN: 150,
+  TRANS_MAX_LEN: 300,
   TRANS_TAN: 50
 };
 

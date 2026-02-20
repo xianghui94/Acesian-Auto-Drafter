@@ -1,16 +1,25 @@
+
 import { DuctParams } from "../../types";
 import { createSvg, drawDim, drawFlange, VIEW_BOX_SIZE, V_CONSTANTS } from "../svgUtils";
 
-const { DIAM: V_DIAM } = V_CONSTANTS;
+const { MAX_DIAM: V_DIAM } = V_CONSTANTS;
 
 export const generateVolumeDamper = (params: DuctParams, activeField: string | null = null) => {
     const VIEW_WIDTH = VIEW_BOX_SIZE;
-    const VIEW_HEIGHT = 500; // Reduced from 800
+    const VIEW_HEIGHT = 500; 
     const cy = VIEW_HEIGHT / 2; 
     const D = V_DIAM + 30; 
     const L = 150; 
-    const cxFront = 120; 
-    const cxSide = 350; 
+    
+    // Centered View Calculations
+    // Total Width = D (Front View) + Gap + L (Side View)
+    // Approximate Gap = 100
+    // Total W approx 230 + 100 + 150 = 480.
+    // Center of this block should be at VIEW_WIDTH/2 (400)
+    // Start X = 400 - 480/2 = 160
+    
+    const cxFront = 250; 
+    const cxSide = 550; 
     const rOuter = (D/2) + 12;
     
     const frontFlange = `<circle cx="${cxFront}" cy="${cy}" r="${rOuter}" class="line" fill="none" />`;
@@ -34,7 +43,6 @@ export const generateVolumeDamper = (params: DuctParams, activeField: string | n
     const xLeft = cxSide - L/2;
     const xRight = cxSide + L/2;
     const yTop = cy - D/2;
-    // const yBot = cy + D/2; // unused
     
     const sideRect = `<rect x="${xLeft}" y="${yTop}" width="${L}" height="${D}" class="line" />`;
     const f1 = drawFlange(xLeft, cy, D, true);

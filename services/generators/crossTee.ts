@@ -1,26 +1,30 @@
 
 import { DuctParams } from "../../types";
-import { createSvg, drawDim, drawFlange, drawAnnotation } from "../svgUtils";
+import { createSvg, drawDim, drawFlange, drawAnnotation, V_CONSTANTS } from "../svgUtils";
 import { calculateRadialBranchPath } from "../geometry/branchMath";
 
 export const generateCrossTee = (params: DuctParams, activeField: string | null = null) => {
-  const VIEW_WIDTH = 800;
-  const VIEW_HEIGHT = 500;
-  const cy = VIEW_HEIGHT / 2;
-  const cxLeft = VIEW_WIDTH * 0.3;
-  const cxRight = VIEW_WIDTH * 0.75;
+  const VIEW_WIDTH = 1000; // Increased width
+  const VIEW_HEIGHT = 600; 
+  const cy = 300; 
+  
+  // Separation: Left centered at 250, Right at 750
+  const cxLeft = 250;
+  const cxRight = 750;
 
   const Md = params.main_d || 500;
   const Bd = params.tap_d || 300;
   const L = params.length || (Bd + 200);
-  const neckLen = params.branch_l || 100; // User input or default 100
+  const neckLen = params.branch_l || 100;
 
-  // Visual scaling
-  const V_MD = 120;
-  const scale = V_MD / Md;
-  const V_BD = Bd * scale;
-  const V_L = L * scale;
-  const V_NECK = neckLen * scale;
+  // SCHEMATIC CLAMPING
+  const V_MD = Math.min(Md, V_CONSTANTS.MAX_DIAM);
+  let V_BD = Math.min(Bd, V_CONSTANTS.MAX_DIAM);
+  if (Bd < Md) {
+      V_BD = V_MD * (Bd/Md);
+  }
+  const V_L = Math.min(L, V_CONSTANTS.MAX_LEN);
+  const V_NECK = Math.min(neckLen, V_CONSTANTS.BRANCH_MAX_LEN);
 
   // --- TOP VIEW (Left) ---
   const xL_Left = cxLeft - V_L/2;
@@ -49,13 +53,11 @@ export const generateCrossTee = (params: DuctParams, activeField: string | null 
     Z
   `;
 
-  // Flanges Top View
   const f1 = drawFlange(xL_Left, cy, V_MD, true); 
   const f2 = drawFlange(xR_Left, cy, V_MD, true); 
   const f3 = drawFlange(cxLeft, yBranchTop, V_BD, false); 
   const f4 = drawFlange(cxLeft, yBranchBot, V_BD, false); 
   
-  // Remarks
   let remark1 = "";
   if (params.flangeRemark1) {
       remark1 = drawAnnotation(xL_Left, yB_Left, params.flangeRemark1, false, false, 130, false).svg;
@@ -76,7 +78,6 @@ export const generateCrossTee = (params: DuctParams, activeField: string | null 
       remark4 = drawAnnotation(cxLeft, yBranchBot, params.flangeRemark4, false, true, 60).svg;
   }
 
-  // Weld Line
   const rMain = V_MD / 2;
   const rBranch = V_BD / 2;
   const dip = rMain - Math.sqrt(Math.max(0, rMain*rMain - rBranch*rBranch));
@@ -93,13 +94,8 @@ export const generateCrossTee = (params: DuctParams, activeField: string | null 
   const dimMd = drawDim(xL_Left - 15, yT_Left, xL_Left - 15, yB_Left, `Ø${Md}`, 'left', null, 'main_d', activeField);
   
   // --- SIDE VIEW (Right) ---
-  
-  // Main Circle
   const circleRight = `<circle cx="${cxRight}" cy="${cy}" r="${V_MD/2}" class="line" />`;
-  
-  // Left Branch (270 deg)
   const geoLeft = calculateRadialBranchPath(cxRight, cy, V_MD/2, V_BD/2, 270, V_NECK, false);
-  // Right Branch (90 deg)
   const geoRight = calculateRadialBranchPath(cxRight, cy, V_MD/2, V_BD/2, 90, V_NECK, false);
   
   const branchLeft = `<path d="${geoLeft.path}" class="line" fill="white" />`;
@@ -108,7 +104,6 @@ export const generateCrossTee = (params: DuctParams, activeField: string | null 
   const f5 = drawFlange(geoLeft.endPoint.x, geoLeft.endPoint.y, V_BD, true);
   const f6 = drawFlange(geoRight.endPoint.x, geoRight.endPoint.y, V_BD, true);
 
-  // Dimensions Side View
   const dimBd = drawDim(geoLeft.endPoint.x, geoLeft.endPoint.y - V_BD/2, geoLeft.endPoint.x, geoLeft.endPoint.y + V_BD/2, `Ø${Bd}`, 'left', null, 'tap_d', activeField);
   
   const xMainEdgeLeft = cxRight - V_MD/2;
