@@ -31,6 +31,15 @@ Rules:
     - If text says "R 1D", calculate radius = d1 * 0.5. (Example: d1=800 and R 1D -> radius=400).
     - If text says "R 1.5D", calculate radius = d1 * 1.0. (Example: d1=800 and R 1.5D -> radius=800).
     Do not blindly copy the "1D" multiplier. Always apply this math.
+11. **CRITICAL TEST PORT & NPT RULE:**
+    If the description contains "Test Port" followed by sizes separated by "x" (e.g., "1/2"x1/2""), it represents NPT fittings, NOT Taps.
+    - The "x" is a separator, NOT a dimension multiplier. 
+    - Example 1: "1/2"x1/2"" means there are EXACTLY TWO NPT ports (Qty NPT = 2). Both are 1/2".
+    - Example 2: "1"x1/2"x1/2"" means there are EXACTLY THREE NPT ports (Qty NPT = 3). One is 1", and two are 1/2".
+    When parsing this:
+    - Set your parameter for "Qty Taps" to 0.
+    - Set your parameter for "Qty NPT" to the counted number.
+    - Store the individual sizes in your NPT configuration array/object.
 
 Example Output Format:
 {
