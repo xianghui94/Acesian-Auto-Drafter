@@ -40,6 +40,11 @@ Rules:
     - Set your parameter for "Qty Taps" to 0.
     - Set your parameter for "Qty NPT" to the counted number.
     - Store the individual sizes in your NPT configuration array/object.
+12. **CRITICAL DAMPER ACTUATION RULE:**
+    When the component is a Volume Control Damper (VCD) or Damper, you MUST extract the 'actuation' type into the params object.
+    - If the description contains "Worm Gear" or "Gear", set "actuation": "Worm Gear".
+    - If the description contains "Handle", "Quadrant", or has no specific mention, default to "actuation": "Handle".
+    Ensure the exact string "Worm Gear" or "Handle" is used so it matches the dropdown options.
 
 Example Output Format:
 {
